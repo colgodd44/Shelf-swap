@@ -718,25 +718,26 @@ function bookCard(b, showDelete=false) {
   </div>`;
 }
 
-async function loadCovers(books) {
+function loadCovers(books) {
   for (const b of books) {
     const el = document.getElementById('cover-' + b.id);
     if (!el) continue;
-    try {
-      const q = encodeURIComponent(b.title + ' ' + b.author);
-      const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
-      if (!res.ok) continue;
-      const data = await res.json();
-      const thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
-      if (!thumb) continue;
-      // Google returns http — force https
-      const src = thumb.replace('http://', 'https://');
-      const img = new Image();
-      img.src = src;
-      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0';
-      img.onload = () => { el.style.position = 'relative'; el.innerHTML = ''; el.appendChild(img); };
-      img.onerror = () => {};
-    } catch { /* keep placeholder */ }
+    // Direct img tag — no fetch, no CORS issues
+    // Open Library covers by title key, ?default=false returns 404 silently if not found
+    const titleKey = b.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const img = new Image();
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;top:0;left:0';
+    img.onload = function() {
+      // Only swap if image is a real cover (not OL's tiny 1px default)
+      if (img.naturalWidth > 10) {
+        el.style.position = 'relative';
+        el.innerHTML = '';
+        el.appendChild(img);
+      }
+    };
+    img.onerror = function() {};
+    // Try Open Library by title — no auth, no API key, direct CDN
+    img.src = 'https://covers.openlibrary.org/b/title/' + encodeURIComponent(b.title) + '-M.jpg';
   }
 }
 
