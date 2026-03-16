@@ -371,7 +371,7 @@
     <div id="my-shelf-grid" class="books-grid"></div>
     <div id="shelf-empty" class="shelf-empty">
       <p>You haven't listed any books yet.</p>
-      <button class="submit-btn" style="max-width:240px;margin:0 auto" onclick="showView('list')">List your first book →</button>
+    empty.innerHTML = '<p>You have not listed any books yet.</p><button class="submit-btn" style="max-width:240px;margin:0 auto" onclick="showView(\"list\")">List your first book →</button>';
     </div>
   </div>
 </div>
@@ -951,33 +951,39 @@ async function renderShelf() {
     empty.innerHTML = '<p>Sign in to see your listed books.</p><button class="submit-btn" style="max-width:200px;margin:0 auto" onclick="openAuth()">Sign in →</button>';
     empty.style.display = 'block'; return;
   }
-  // Load from DB filtered by user_id
+  // Show loading state
+  grid.innerHTML = '<p style="color:#7a6f62;padding:1rem">Loading…</p>';
+  empty.style.display = 'none';
+
   const { data, error } = await db.select('books', { select: '*', filter: { user_id: currentUser.id }, order: 'created_at.desc' });
-  alert('Shelf debug — user: ' + currentUser.id.slice(0,8) + ' | error: ' + (error ? JSON.stringify(error).slice(0,80) : 'none') + ' | books: ' + (data?.length||0));
-  const books = data?.length ? data : mySessionBooks;
-  if (!books.length) {
+  const books = (data && data.length) ? data : mySessionBooks;
+
+  if (!books || !books.length) {
     grid.innerHTML = '';
-    empty.innerHTML = '<p>You have not listed any books yet.</p><button class="submit-btn" style="max-width:240px;margin:0 auto" onclick="showView(`list`)">List your first book →</button>';
+    empty.innerHTML = '<p>You have not listed any books yet.</p><button class="submit-btn" style="max-width:240px;margin:0 auto" onclick="showView(\"list\")">List your first book →</button>';
     empty.style.display = 'block';
-  } else {
-    empty.style.display = 'none';
-    grid.innerHTML = books.map(b => bookCard(b, true)).join('');
-    // Add mark swapped buttons to all non-swapped books
-    books.forEach(b => {
-      const card = document.getElementById('book-' + b.id);
-      if (!card || b.is_swapped) return;
-      const info = card.querySelector('.book-info');
-      if (info && !info.querySelector('.mark-swapped-btn')) {
-        const btn = document.createElement('button');
-        btn.className = 'mark-swapped-btn';
-        btn.style.cssText = 'width:100%;margin-top:0.75rem;display:block';
-        btn.textContent = '✓ Mark as swapped';
-        btn.onclick = (e) => { e.stopPropagation(); markSwapped(b.id); };
-        info.appendChild(btn);
-      }
-    });
-    loadCovers(books);
+    return;
   }
+
+  empty.style.display = 'none';
+  grid.className = 'books-grid';
+  grid.innerHTML = books.map(b => bookCard(b, true)).join('');
+
+  // Add mark swapped buttons
+  books.forEach(b => {
+    const card = document.getElementById('book-' + b.id);
+    if (!card || b.is_swapped) return;
+    const info = card.querySelector('.book-info');
+    if (info && !info.querySelector('.mark-swapped-btn')) {
+      const btn = document.createElement('button');
+      btn.className = 'mark-swapped-btn';
+      btn.style.cssText = 'width:100%;margin-top:0.75rem;display:block';
+      btn.textContent = '✓ Mark as swapped';
+      btn.onclick = (e) => { e.stopPropagation(); markSwapped(b.id); };
+      info.appendChild(btn);
+    }
+  });
+  loadCovers(books);
 }
 
 async function loadRequests() {
