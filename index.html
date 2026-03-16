@@ -953,7 +953,7 @@ async function renderShelf() {
   }
   // Load from DB filtered by user_id
   const { data, error } = await db.select('books', { select: '*', filter: { user_id: currentUser.id }, order: 'created_at.desc' });
-  showToast(error ? 'DB error: ' + JSON.stringify(error).slice(0,60) : 'Loaded ' + (data?.length||0) + ' books from DB');
+  alert('Shelf debug — user: ' + currentUser.id.slice(0,8) + ' | error: ' + (error ? JSON.stringify(error).slice(0,80) : 'none') + ' | books: ' + (data?.length||0));
   const books = data?.length ? data : mySessionBooks;
   if (!books.length) {
     grid.innerHTML = '';
