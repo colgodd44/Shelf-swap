@@ -348,7 +348,7 @@
 
 <script>
 const SUPABASE_URL = 'https://ylmbzciajgcvtasefgmm.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlsbWJ6Y2lhamdjdnRhc2VmZ21tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzQ1MjgsImV4cCI6MjA4OTI1MDUyOH0.fYf3vgqRQWqawUfjuszLeclN1nS0ApgBs-mnqFvqITA';
+const SUPABASE_KEY = 'sb_publishable_rbJctb9BFG-XMnzoA0X3SQ_dFZH5i1K';
 
 // Direct REST API — avoids Safari iOS DataCloneError with supabase-js
 const db = {
@@ -487,20 +487,19 @@ async function loadCovers(books) {
     const el = document.getElementById('cover-' + b.id);
     if (!el) continue;
     try {
-      // Search Open Library for the book
-      const res = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(b.title)}&author=${encodeURIComponent(b.author)}&limit=1&fields=cover_i,isbn`);
+      const q = encodeURIComponent(b.title + ' ' + b.author);
+      const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
+      if (!res.ok) continue;
       const data = await res.json();
-      const doc = data.docs?.[0];
-      const coverId = doc?.cover_i;
-      if (coverId) {
-        const img = document.createElement('img');
-        img.src = `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
-        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0';
-        img.onload = () => el.innerHTML = '';
-        img.onerror = () => {}; // keep placeholder
-        el.style.position = 'relative';
-        el.appendChild(img);
-      }
+      const thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
+      if (!thumb) continue;
+      // Google returns http — force https
+      const src = thumb.replace('http://', 'https://');
+      const img = new Image();
+      img.src = src;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0';
+      img.onload = () => { el.style.position = 'relative'; el.innerHTML = ''; el.appendChild(img); };
+      img.onerror = () => {};
     } catch { /* keep placeholder */ }
   }
 }
