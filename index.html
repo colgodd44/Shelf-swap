@@ -241,7 +241,7 @@
     <button class="nav-btn" onclick="showView('shelf')">My Shelf</button>
     <button class="nav-btn" onclick="showView('requests')">Requests <span id="req-count" style="color:var(--amber)"></span></button>
     <button class="nav-btn primary" onclick="handleListClick()">+ List a Book</button>
-    <button class="nav-btn" id="profile-btn" onclick="showView('profile')" style="display:none">Profile</button><div id="auth-nav"></div>
+    <button class="nav-btn" id="profile-btn" onclick="showView('profile')">Profile</button><div id="auth-nav"></div>
   </div>
 </nav>
 
@@ -367,7 +367,7 @@
 <div id="view-shelf" class="view">
   <div class="shelf-view">
     <h2>My shelf</h2>
-    <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2rem;">Books you've listed this session</p>
+    <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2rem;">Your listed books</p>
     <div id="my-shelf-grid" class="books-grid"></div>
     <div id="shelf-empty" class="shelf-empty">
       <p>You haven't listed any books yet.</p>
@@ -493,8 +493,9 @@ const db = {
     if (params.in) url += `${params.in.col}=in.(${params.in.vals.join(',')})&`;
     if (params.order) url += `order=${params.order}&`;
     if (params.limit) url += `limit=${params.limit}&`;
-    const res = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, Accept: 'application/json' } });
-    if (!res.ok) { const e = await res.json(); return { data: null, error: e }; }
+    const token = localStorage.getItem('ss_token') || SUPABASE_KEY;
+    const res = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+    if (!res.ok) { try { const e = await res.json(); return { data: null, error: e }; } catch { return { data: null, error: { message: res.statusText } }; } }
     const data = await res.json();
     return { data, error: null };
   },
@@ -517,10 +518,10 @@ const db = {
   async update(table, id, body) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
       method: 'PATCH',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + (localStorage.getItem('ss_token') || SUPABASE_KEY), 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    if (!res.ok) { const e = await res.json(); return { error: e }; }
+    if (!res.ok) { try { const e = await res.json(); return { error: e }; } catch { return { error: { message: res.statusText } }; } }
     return { error: null };
   },
   async delete(table, id) {
@@ -565,14 +566,11 @@ async function checkSession() {
 
 function updateAuthNav() {
   const el = document.getElementById('auth-nav');
-  const profileBtn = document.getElementById('profile-btn');
   if (currentUser) {
     const name = currentUser.user_metadata?.display_name || currentUser.email.split('@')[0];
     el.innerHTML = '<span class="user-badge">' + name + '</span><button class="nav-btn" onclick="signOut()" style="margin-left:0.5rem">Sign out</button>';
-    if (profileBtn) profileBtn.style.display = 'block';
   } else {
     el.innerHTML = '<button class="nav-btn" onclick="openAuth()">Sign in</button>';
-    if (profileBtn) profileBtn.style.display = 'none';
   }
 }
 
@@ -963,16 +961,16 @@ async function renderShelf() {
   } else {
     empty.style.display = 'none';
     grid.innerHTML = books.map(b => bookCard(b, true)).join('');
-    // Add mark swapped buttons
+    // Add mark swapped buttons to all non-swapped books
     books.forEach(b => {
       const card = document.getElementById('book-' + b.id);
       if (!card || b.is_swapped) return;
       const info = card.querySelector('.book-info');
-      if (info) {
+      if (info && !info.querySelector('.mark-swapped-btn')) {
         const btn = document.createElement('button');
         btn.className = 'mark-swapped-btn';
-        btn.style.cssText = 'width:100%;margin-top:0.5rem;display:block';
-        btn.textContent = 'Mark as swapped';
+        btn.style.cssText = 'width:100%;margin-top:0.75rem;display:block';
+        btn.textContent = '✓ Mark as swapped';
         btn.onclick = (e) => { e.stopPropagation(); markSwapped(b.id); };
         info.appendChild(btn);
       }
