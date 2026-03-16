@@ -842,7 +842,7 @@ function openModal(id) {
 function shareBook() {
   if (!currentBook) return;
   const text = `📚 "${currentBook.title}" by ${currentBook.author} — available to swap in ${currentBook.location} on Shelfswap`;
-  const url = 'https://colgodd44.github.io/Shelf-swap/';
+  const url = 'https://shelfswap.online';
   if (navigator.share) {
     navigator.share({ title: currentBook.title, text, url }).catch(() => {});
   } else {
