@@ -223,7 +223,7 @@
 <body>
 
 <nav>
-  <div class="logo" onclick="showView('landing')" style="cursor:pointer">Shelf<span>swap</span></div>
+  <div class="logo" style="cursor:pointer" onclick="event.stopPropagation();showView('landing')">Shelf<span>swap</span></div>
   <div class="nav-links">
     <button class="nav-btn" onclick="showView('browse')">Browse</button>
     <button class="nav-btn" onclick="showView('shelf')">My Shelf</button>
@@ -636,6 +636,7 @@ function updateLandingStats() {
 }
 
 async function init() {
+  showView('landing');
   renderSkeletons();
   await Promise.all([loadBooks(), loadStats(), checkSession()]);
   updateLandingStats();
