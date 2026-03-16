@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -188,7 +187,6 @@
     .list-view,.shelf-view { padding:1.5rem 1rem; }
   }
 </style>
-
 </head>
 <body>
 
@@ -204,7 +202,6 @@
 </nav>
 
 <!-- AUTH MODAL -->
-
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-box">
     <h2>Welcome back</h2>
@@ -222,7 +219,6 @@
 </div>
 
 <!-- BROWSE -->
-
 <div id="view-browse" class="view active">
   <div class="hero-bar">
     <div>
@@ -260,7 +256,6 @@
 </div>
 
 <!-- LIST -->
-
 <div id="view-list" class="view">
   <div class="list-view">
     <h2>List a book</h2>
@@ -325,7 +320,6 @@
 </div>
 
 <!-- MY SHELF -->
-
 <div id="view-shelf" class="view">
   <div class="shelf-view">
     <h2>My shelf</h2>
@@ -339,7 +333,6 @@
 </div>
 
 <!-- REQUESTS -->
-
 <div id="view-requests" class="view">
   <div style="padding:2rem;max-width:700px">
     <h2 style="font-family:'Playfair Display',serif;font-size:2rem;font-style:italic;margin-bottom:0.4rem">Swap requests</h2>
@@ -352,7 +345,6 @@
 </div>
 
 <!-- MODAL -->
-
 <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
   <div class="modal">
     <div class="modal-header">
@@ -446,8 +438,10 @@ let authMode = 'signin';
 
 async function checkSession() {
   try {
+    const token = localStorage.getItem('ss_token');
+    if (!token) { currentUser = null; updateAuthNav(); return; }
     const res = await fetch(SUPABASE_URL + '/auth/v1/user', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + (localStorage.getItem('ss_token') || '') }
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token }
     });
     if (res.ok) {
       const data = await res.json();
@@ -504,13 +498,15 @@ async function submitAuth() {
   try {
     const res = await fetch(SUPABASE_URL + endpoint, {
       method: 'POST',
-      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    const data = await res.json();
+    let data = {};
+    try { data = await res.json(); } catch {}
     if (!res.ok) {
       btn.disabled = false; btn.textContent = authMode === 'signup' ? 'Create account →' : 'Sign in →';
-      showToast(data.error_description || data.msg || 'Auth failed', true); return;
+      const msg = data.error_description || data.msg || data.message || data.error || ('HTTP ' + res.status);
+      showToast(msg, true); return;
     }
     localStorage.setItem('ss_token', data.access_token);
     currentUser = data.user;
@@ -527,7 +523,7 @@ async function signOut() {
   try {
     await fetch(SUPABASE_URL + '/auth/v1/logout', {
       method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + (localStorage.getItem('ss_token') || '') }
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + (localStorage.getItem('ss_token') || '') }
     });
   } catch {}
   localStorage.removeItem('ss_token');
@@ -823,6 +819,5 @@ function showToast(msg, isError=false) {
 
 init();
 </script>
-
 </body>
 </html>
