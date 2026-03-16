@@ -892,57 +892,62 @@ async function lookupISBN() {
   } catch(e) { showToast('Lookup failed — fill in manually', true); }
 }
 
-// ISBN barcode scanner using device camera
-function scanISBN() {
-  // Create a video overlay to scan barcode
+// ISBN barcode scanner using html5-qrcode library (works on iOS Safari)
+async function scanISBN() {
+  // Dynamically load html5-qrcode
+  if (!window.Html5Qrcode) {
+    showToast('Loading scanner…');
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem';
+  overlay.id = 'scan-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:#1a1410;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:1rem';
   overlay.innerHTML = `
-    <p style="font-family:'DM Mono',monospace;font-size:0.75rem;color:#f5f0e8;letter-spacing:0.1em;text-transform:uppercase">Point camera at barcode</p>
-    <video id="scan-video" style="width:100%;max-width:400px;border:2px solid #c8853a" autoplay playsinline></video>
-    <canvas id="scan-canvas" style="display:none"></canvas>
-    <p id="scan-status" style="font-family:'DM Mono',monospace;font-size:0.7rem;color:#7a6f62;letter-spacing:0.05em">Scanning…</p>
+    <p style="font-family:'DM Mono',monospace;font-size:0.75rem;color:#f5f0e8;letter-spacing:0.1em;text-transform:uppercase">Point camera at book barcode</p>
+    <div id="qr-reader" style="width:100%;max-width:400px;border:2px solid #c8853a"></div>
+    <p id="scan-status" style="font-family:'DM Mono',monospace;font-size:0.7rem;color:#7a6f62;letter-spacing:0.05em;text-align:center">Scanning…</p>
     <button onclick="stopScan()" style="padding:0.75rem 2rem;background:#c8853a;border:none;color:#1a1410;font-family:'DM Mono',monospace;font-size:0.75rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Cancel</button>
   `;
   document.body.appendChild(overlay);
-  window._scanOverlay = overlay;
 
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    .then(stream => {
-      const video = document.getElementById('scan-video');
-      video.srcObject = stream;
-      window._scanStream = stream;
-      // Use BarcodeDetector if available (Chrome/Safari 17+)
-      if ('BarcodeDetector' in window) {
-        const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','upc_a','upc_e'] });
-        const scan = async () => {
-          if (!window._scanStream) return;
-          try {
-            const barcodes = await detector.detect(video);
-            if (barcodes.length > 0) {
-              const code = barcodes[0].rawValue;
-              stopScan();
-              document.getElementById('isbn-input').value = code;
-              lookupISBN();
-              return;
-            }
-          } catch {}
-          requestAnimationFrame(scan);
-        };
-        video.onloadedmetadata = () => scan();
-      } else {
-        document.getElementById('scan-status').textContent = 'Scanner not supported — type ISBN manually';
-      }
-    })
-    .catch(() => {
-      stopScan();
-      showToast('Camera access denied', true);
-    });
+  const html5QrCode = new Html5Qrcode('qr-reader');
+  window._scanner = html5QrCode;
+
+  try {
+    await html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 280, height: 120 }, formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E
+      ]},
+      (decodedText) => {
+        stopScan();
+        document.getElementById('isbn-input').value = decodedText;
+        lookupISBN();
+      },
+      (err) => { /* scanning */ }
+    );
+  } catch(e) {
+    stopScan();
+    showToast('Camera error: ' + e, true);
+  }
 }
 
-function stopScan() {
-  if (window._scanStream) { window._scanStream.getTracks().forEach(t => t.stop()); window._scanStream = null; }
-  if (window._scanOverlay) { window._scanOverlay.remove(); window._scanOverlay = null; }
+async function stopScan() {
+  if (window._scanner) {
+    try { await window._scanner.stop(); } catch {}
+    window._scanner = null;
+  }
+  document.getElementById('scan-overlay')?.remove();
 }
 
 async function submitBook() {
