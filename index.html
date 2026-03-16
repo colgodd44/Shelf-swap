@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Shelfswap — Trade Books Locally</title>
+<meta name="theme-color" content="#1a1410">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Shelfswap">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a1410'/><text y='.9em' font-size='80'>📚</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Mono:wght@300;400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 
@@ -179,6 +185,12 @@
   .user-badge { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--amber); letter-spacing:0.05em; padding:0.5rem 0.75rem; border:1px solid var(--card-border); }
 
 
+
+  .swapped-overlay { position:absolute; inset:0; background:rgba(26,20,16,0.85); display:flex; align-items:center; justify-content:center; z-index:5; }
+  .swapped-label { font-family:'DM Mono',monospace; font-size:0.7rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--sage); border:1px solid var(--sage); padding:0.4rem 0.8rem; }
+  .mark-swapped-btn { padding:0.5rem 1rem; font-family:'DM Mono',monospace; font-size:0.6rem; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; border:1px solid var(--sage); color:var(--sage); background:transparent; transition:all 0.2s; }
+  .mark-swapped-btn:hover { background:var(--sage); color:var(--ink); }
+
   .delete-btn { position:absolute; top:0.5rem; left:0.5rem; background:rgba(26,20,16,0.9); border:1px solid var(--rust); color:var(--rust); font-family:'DM Mono',monospace; font-size:0.55rem; letter-spacing:0.08em; text-transform:uppercase; padding:0.25rem 0.5rem; cursor:pointer; z-index:10; transition:all 0.2s; }
   .delete-btn:hover { background:var(--rust); color:var(--paper); }
   .contact-box { background:var(--ink); border:1px solid var(--amber); padding:1rem; margin-top:0.5rem; }
@@ -229,7 +241,7 @@
     <button class="nav-btn" onclick="showView('shelf')">My Shelf</button>
     <button class="nav-btn" onclick="showView('requests')">Requests <span id="req-count" style="color:var(--amber)"></span></button>
     <button class="nav-btn primary" onclick="handleListClick()">+ List a Book</button>
-    <div id="auth-nav"></div>
+    <button class="nav-btn" id="profile-btn" onclick="showView('profile')" style="display:none">Profile</button><div id="auth-nav"></div>
   </div>
 </nav>
 
@@ -405,11 +417,22 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-primary" id="request-btn" onclick="requestSwap()">Request this swap →</button>
+      <button class="btn btn-secondary" onclick="shareBook()" id="share-btn">Share</button>
       <button class="btn btn-secondary" onclick="closeModal()">Back</button>
     </div>
   </div>
 </div>
 
+
+
+<!-- PROFILE VIEW -->
+<div id="view-profile" class="view">
+  <div style="max-width:600px;margin:0 auto;padding:2.5rem 2rem">
+    <h2 style="font-family:'Playfair Display',serif;font-size:2rem;font-style:italic;margin-bottom:0.4rem">My profile</h2>
+    <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2rem">Account settings</p>
+    <div id="profile-content"></div>
+  </div>
+</div>
 
 <!-- LANDING PAGE -->
 <div id="view-landing" class="view">
@@ -542,11 +565,14 @@ async function checkSession() {
 
 function updateAuthNav() {
   const el = document.getElementById('auth-nav');
+  const profileBtn = document.getElementById('profile-btn');
   if (currentUser) {
     const name = currentUser.user_metadata?.display_name || currentUser.email.split('@')[0];
     el.innerHTML = '<span class="user-badge">' + name + '</span><button class="nav-btn" onclick="signOut()" style="margin-left:0.5rem">Sign out</button>';
+    if (profileBtn) profileBtn.style.display = 'block';
   } else {
     el.innerHTML = '<button class="nav-btn" onclick="openAuth()">Sign in</button>';
+    if (profileBtn) profileBtn.style.display = 'none';
   }
 }
 
@@ -665,6 +691,44 @@ function showView(name) {
   if (name === 'shelf') renderShelf();
   if (name === 'requests') loadRequests();
   if (name === 'landing') updateLandingStats();
+  if (name === 'profile') renderProfile();
+}
+
+async function renderProfile() {
+  const el = document.getElementById('profile-content');
+  if (!currentUser) {
+    el.innerHTML = '<p style="font-family:DM Mono,monospace;font-size:0.75rem;color:var(--muted)">Sign in to view your profile.</p>';
+    return;
+  }
+  const name = currentUser.user_metadata?.display_name || currentUser.email.split('@')[0];
+  const { data: books } = await db.select('books', { select: '*', filter: { user_id: currentUser.id }, order: 'created_at.desc' });
+  const listed = books?.length || 0;
+  const swapped = books?.filter(b => b.is_swapped).length || 0;
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--card-border);margin-bottom:2rem">
+      <div style="background:var(--card-bg);padding:1.5rem;text-align:center">
+        <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:var(--amber)">${listed}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase">Listed</div>
+      </div>
+      <div style="background:var(--card-bg);padding:1.5rem;text-align:center">
+        <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:var(--amber)">${swapped}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase">Swapped</div>
+      </div>
+      <div style="background:var(--card-bg);padding:1.5rem;text-align:center">
+        <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:var(--amber)">${listed - swapped}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase">Available</div>
+      </div>
+    </div>
+    <div style="background:var(--card-bg);border:1px solid var(--card-border);padding:1.5rem;margin-bottom:1rem">
+      <p style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.4rem">Display name</p>
+      <p style="font-family:'Playfair Display',serif;font-size:1.1rem">${name}</p>
+    </div>
+    <div style="background:var(--card-bg);border:1px solid var(--card-border);padding:1.5rem;margin-bottom:2rem">
+      <p style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.4rem">Email</p>
+      <p style="font-family:'Playfair Display',serif;font-size:1rem">${currentUser.email}</p>
+    </div>
+    <button onclick="showView('shelf')" style="width:100%;padding:0.85rem;background:var(--amber);border:none;color:var(--ink);font-family:'DM Mono',monospace;font-size:0.75rem;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer">View my shelf →</button>
+  `;
 }
 
 function renderSkeletons() {
@@ -704,10 +768,12 @@ function bookCard(b, showDelete=false) {
     <span class="placeholder-title">${b.title}</span><span class="placeholder-author">${b.author}</span>
   </div>`;
   const deleteBtn = showDelete ? `<button class="delete-btn" onclick="event.stopPropagation();deleteBook('${b.id}')">✕ Remove</button>` : '';
+  const swappedOverlay = b.is_swapped ? `<div class="swapped-overlay"><span class="swapped-label">✓ Swapped</span></div>` : '';
   return `<div class="book-card" id="book-${b.id}" onclick="openModal('${b.id}')">
     <div id="${imgId}" style="width:100%;aspect-ratio:2/3;position:relative;overflow:hidden">
       ${placeholder}
       ${deleteBtn}
+      ${swappedOverlay}
     </div>
     <span class="post-badge ${b.will_post ? 'yes' : ''}">${b.will_post ? '✉ Post' : '📍 Local'}</span>
     <div class="book-info">
@@ -773,6 +839,17 @@ function openModal(id) {
   const btn = document.getElementById('request-btn');
   btn.disabled = false; btn.textContent = 'Request this swap →';
   document.getElementById('modal').classList.add('open');
+}
+
+function shareBook() {
+  if (!currentBook) return;
+  const text = `📚 "${currentBook.title}" by ${currentBook.author} — available to swap in ${currentBook.location} on Shelfswap`;
+  const url = 'https://colgodd44.github.io/Shelf-swap/';
+  if (navigator.share) {
+    navigator.share({ title: currentBook.title, text, url }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(text + '\n' + url).then(() => showToast('Link copied ✓')).catch(() => showToast('Could not copy', true));
+  }
 }
 
 function closeModal() { document.getElementById('modal').classList.remove('open'); currentBook = null; }
@@ -849,6 +926,14 @@ async function submitBook() {
   setTimeout(() => showView('shelf'), 1000);
 }
 
+async function markSwapped(id) {
+  const { error } = await db.update('books', id, { is_swapped: true });
+  if (error) { showToast('Could not update — try again', true); return; }
+  allBooks = allBooks.map(b => b.id === id ? {...b, is_swapped: true} : b);
+  showToast('Marked as swapped ✓');
+  renderShelf();
+}
+
 async function deleteBook(id) {
   if (!confirm('Remove this book from Shelfswap?')) return;
   const { error } = await db.delete('books', id);
@@ -878,6 +963,20 @@ async function renderShelf() {
   } else {
     empty.style.display = 'none';
     grid.innerHTML = books.map(b => bookCard(b, true)).join('');
+    // Add mark swapped buttons
+    books.forEach(b => {
+      const card = document.getElementById('book-' + b.id);
+      if (!card || b.is_swapped) return;
+      const info = card.querySelector('.book-info');
+      if (info) {
+        const btn = document.createElement('button');
+        btn.className = 'mark-swapped-btn';
+        btn.style.cssText = 'width:100%;margin-top:0.5rem;display:block';
+        btn.textContent = 'Mark as swapped';
+        btn.onclick = (e) => { e.stopPropagation(); markSwapped(b.id); };
+        info.appendChild(btn);
+      }
+    });
     loadCovers(books);
   }
 }
