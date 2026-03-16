@@ -305,10 +305,11 @@
     <h2>List a book</h2>
     <p class="list-subtitle">Takes less than a minute</p>
     <div class="form-group">
-      <label class="form-label">ISBN (optional — auto-fills details)</label>
+      <label class="form-label">ISBN (optional — auto-fills details + cover)</label>
       <div class="isbn-row">
-        <input class="form-input" id="isbn-input" type="text" placeholder="e.g. 9780141187761">
+        <input class="form-input" id="isbn-input" type="text" placeholder="e.g. 9780141187761" inputmode="numeric">
         <button class="lookup-btn" onclick="lookupISBN()">Look up →</button>
+        <button class="lookup-btn" onclick="scanISBN()" style="background:rgba(200,133,58,0.15)" title="Scan barcode">📷</button>
       </div>
     </div>
     <div class="form-row">
@@ -782,26 +783,24 @@ function bookCard(b, showDelete=false) {
   </div>`;
 }
 
-function loadCovers(books) {
+async function loadCovers(books) {
   for (const b of books) {
     const el = document.getElementById('cover-' + b.id);
     if (!el) continue;
-    // Direct img tag — no fetch, no CORS issues
-    // Open Library covers by title key, ?default=false returns 404 silently if not found
-    const titleKey = b.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const img = new Image();
-    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;top:0;left:0';
-    img.onload = function() {
-      // Only swap if image is a real cover (not OL's tiny 1px default)
-      if (img.naturalWidth > 10) {
-        el.style.position = 'relative';
-        el.innerHTML = '';
-        el.appendChild(img);
-      }
-    };
-    img.onerror = function() {};
-    // Try Open Library by title — no auth, no API key, direct CDN
-    img.src = 'https://covers.openlibrary.org/b/title/' + encodeURIComponent(b.title) + '-M.jpg';
+    try {
+      // Use Google Books API — fully CORS-friendly on real domains
+      const q = b.isbn ? 'isbn:' + b.isbn : encodeURIComponent(b.title + ' ' + b.author);
+      const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
+      if (!res.ok) continue;
+      const data = await res.json();
+      const thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
+      if (!thumb) continue;
+      const src = thumb.replace('http://', 'https://').replace('zoom=1', 'zoom=2');
+      const img = new Image();
+      img.src = src;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0';
+      img.onload = () => { el.style.position = 'relative'; el.innerHTML = ''; el.appendChild(img); };
+    } catch { /* keep placeholder */ }
   }
 }
 
@@ -875,14 +874,75 @@ async function lookupISBN() {
   if (!isbn) return;
   showToast('Looking up ISBN…');
   try {
-    const res = await fetch('https://openlibrary.org/search.json?isbn=' + isbn + '&fields=title,author_name&limit=1');
+    // Use Google Books — works on real domain, returns title + author + cover
+    const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + isbn + '&maxResults=1');
     const data = await res.json();
-    const doc = data.docs?.[0];
-    if (!doc) { showToast('ISBN not found — fill in manually', true); return; }
-    document.getElementById('book-title').value = doc.title || '';
-    document.getElementById('book-author').value = doc.author_name?.[0] || '';
+    const info = data.items?.[0]?.volumeInfo;
+    if (!info) { showToast('ISBN not found — fill in manually', true); return; }
+    document.getElementById('book-title').value = info.title || '';
+    document.getElementById('book-author').value = info.authors?.[0] || '';
+    if (info.categories?.[0]) {
+      const genreMap = { 'Fiction':['fiction','novel'], 'Non-fiction':['nonfiction','non-fiction','self-help','business'], 'Sci-fi':['science fiction','sci-fi'], 'Biography':['biography','autobiography','memoir'], 'History':['history'], 'Philosophy':['philosophy'], 'Poetry':['poetry'], 'Crime':['crime','thriller','mystery'] };
+      const cat = info.categories[0].toLowerCase();
+      for (const [genre, keys] of Object.entries(genreMap)) {
+        if (keys.some(k => cat.includes(k))) { document.getElementById('book-genre').value = genre; break; }
+      }
+    }
     showToast('Details filled in ✓');
-  } catch(e) { showToast('Lookup failed: ' + e.message, true); }
+  } catch(e) { showToast('Lookup failed — fill in manually', true); }
+}
+
+// ISBN barcode scanner using device camera
+function scanISBN() {
+  // Create a video overlay to scan barcode
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem';
+  overlay.innerHTML = `
+    <p style="font-family:'DM Mono',monospace;font-size:0.75rem;color:#f5f0e8;letter-spacing:0.1em;text-transform:uppercase">Point camera at barcode</p>
+    <video id="scan-video" style="width:100%;max-width:400px;border:2px solid #c8853a" autoplay playsinline></video>
+    <canvas id="scan-canvas" style="display:none"></canvas>
+    <p id="scan-status" style="font-family:'DM Mono',monospace;font-size:0.7rem;color:#7a6f62;letter-spacing:0.05em">Scanning…</p>
+    <button onclick="stopScan()" style="padding:0.75rem 2rem;background:#c8853a;border:none;color:#1a1410;font-family:'DM Mono',monospace;font-size:0.75rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Cancel</button>
+  `;
+  document.body.appendChild(overlay);
+  window._scanOverlay = overlay;
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(stream => {
+      const video = document.getElementById('scan-video');
+      video.srcObject = stream;
+      window._scanStream = stream;
+      // Use BarcodeDetector if available (Chrome/Safari 17+)
+      if ('BarcodeDetector' in window) {
+        const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','upc_a','upc_e'] });
+        const scan = async () => {
+          if (!window._scanStream) return;
+          try {
+            const barcodes = await detector.detect(video);
+            if (barcodes.length > 0) {
+              const code = barcodes[0].rawValue;
+              stopScan();
+              document.getElementById('isbn-input').value = code;
+              lookupISBN();
+              return;
+            }
+          } catch {}
+          requestAnimationFrame(scan);
+        };
+        video.onloadedmetadata = () => scan();
+      } else {
+        document.getElementById('scan-status').textContent = 'Scanner not supported — type ISBN manually';
+      }
+    })
+    .catch(() => {
+      stopScan();
+      showToast('Camera access denied', true);
+    });
+}
+
+function stopScan() {
+  if (window._scanStream) { window._scanStream.getTracks().forEach(t => t.stop()); window._scanStream = null; }
+  if (window._scanOverlay) { window._scanOverlay.remove(); window._scanOverlay = null; }
 }
 
 async function submitBook() {
@@ -894,7 +954,8 @@ async function submitBook() {
   const displayName = currentUser ? (currentUser.user_metadata?.display_name || currentUser.email.split('@')[0]) : (ownerName || 'Anonymous');
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = 'Listing…';
-  const payload = { title, author, genre: document.getElementById('book-genre').value || null, condition: selectedCondition, location, will_post: selectedWillPost, note: document.getElementById('book-note').value.trim() || null, owner_name: displayName, user_id: currentUser?.id || null };
+  const isbnVal = document.getElementById('isbn-input').value.trim().replace(/[^0-9X]/gi,'') || null;
+  const payload = { title, author, genre: document.getElementById('book-genre').value || null, condition: selectedCondition, location, will_post: selectedWillPost, note: document.getElementById('book-note').value.trim() || null, owner_name: displayName, user_id: currentUser?.id || null, isbn: isbnVal };
   try {
     const res = await fetch(SUPABASE_URL + '/rest/v1/books', {
       method: 'POST',
