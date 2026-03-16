@@ -178,6 +178,38 @@
   .auth-close:hover { border-color:var(--amber); color:var(--amber); }
   .user-badge { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--amber); letter-spacing:0.05em; padding:0.5rem 0.75rem; border:1px solid var(--card-border); }
 
+
+  .delete-btn { position:absolute; top:0.5rem; left:0.5rem; background:rgba(26,20,16,0.9); border:1px solid var(--rust); color:var(--rust); font-family:'DM Mono',monospace; font-size:0.55rem; letter-spacing:0.08em; text-transform:uppercase; padding:0.25rem 0.5rem; cursor:pointer; z-index:10; transition:all 0.2s; }
+  .delete-btn:hover { background:var(--rust); color:var(--paper); }
+  .contact-box { background:var(--ink); border:1px solid var(--amber); padding:1rem; margin-top:0.5rem; }
+  .contact-box p { font-family:'DM Mono',monospace; font-size:0.7rem; color:var(--muted); letter-spacing:0.05em; margin-bottom:0.4rem; }
+  .contact-box a { color:var(--amber); text-decoration:none; font-family:'DM Mono',monospace; font-size:0.85rem; }
+  .contact-box a:hover { text-decoration:underline; }
+  /* LANDING */
+  .landing { display:none; }
+  .landing.active { display:block; }
+  .landing-hero { min-height:90vh; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; padding:4rem 2rem; position:relative; overflow:hidden; }
+  .landing-hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 20% 50%, rgba(200,133,58,0.08) 0%, transparent 60%); pointer-events:none; }
+  .landing-eyebrow { font-family:'DM Mono',monospace; font-size:0.7rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--amber); margin-bottom:1.5rem; }
+  .landing-h1 { font-family:'Playfair Display',serif; font-size:clamp(3rem,8vw,6rem); font-weight:900; line-height:0.95; max-width:800px; margin-bottom:2rem; }
+  .landing-h1 em { color:var(--amber); font-style:italic; display:block; }
+  .landing-sub { font-family:'Libre Baskerville',serif; font-size:1.1rem; color:var(--muted); max-width:500px; line-height:1.7; margin-bottom:3rem; }
+  .landing-ctas { display:flex; gap:1rem; flex-wrap:wrap; }
+  .landing-cta-primary { padding:1rem 2rem; background:var(--amber); color:var(--ink); font-family:'DM Mono',monospace; font-size:0.8rem; font-weight:500; letter-spacing:0.12em; text-transform:uppercase; border:none; cursor:pointer; transition:all 0.2s; }
+  .landing-cta-primary:hover { background:var(--highlight); }
+  .landing-cta-secondary { padding:1rem 2rem; background:transparent; color:var(--muted); font-family:'DM Mono',monospace; font-size:0.8rem; letter-spacing:0.12em; text-transform:uppercase; border:1px solid var(--card-border); cursor:pointer; transition:all 0.2s; }
+  .landing-cta-secondary:hover { border-color:var(--amber); color:var(--amber); }
+  .landing-features { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1px; background:var(--card-border); margin:0; }
+  .landing-feature { background:var(--ink); padding:2.5rem 2rem; }
+  .feature-icon { font-size:1.5rem; margin-bottom:1rem; }
+  .feature-title { font-family:'Playfair Display',serif; font-size:1.1rem; font-weight:700; margin-bottom:0.5rem; }
+  .feature-desc { font-family:'DM Mono',monospace; font-size:0.7rem; color:var(--muted); letter-spacing:0.03em; line-height:1.7; }
+  .landing-stats { display:flex; gap:3rem; padding:3rem 2rem; border-top:1px solid var(--card-border); border-bottom:1px solid var(--card-border); flex-wrap:wrap; }
+  .landing-stat-num { font-family:'Playfair Display',serif; font-size:2.5rem; font-weight:900; color:var(--amber); display:block; }
+  .landing-stat-label { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; }
+  .landing-footer { padding:2rem; border-top:1px solid var(--card-border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; }
+  .landing-footer p { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted); letter-spacing:0.05em; }
+
   @media(max-width:600px) {
     .hero-bar { padding:1.5rem 1rem; }
     .books-section { padding:1rem; }
@@ -191,7 +223,7 @@
 <body>
 
 <nav>
-  <div class="logo">Shelf<span>swap</span></div>
+  <div class="logo" onclick="showView('landing')" style="cursor:pointer">Shelf<span>swap</span></div>
   <div class="nav-links">
     <button class="nav-btn" onclick="showView('browse')">Browse</button>
     <button class="nav-btn" onclick="showView('shelf')">My Shelf</button>
@@ -363,16 +395,63 @@
         <div class="meta-item"><span class="meta-label">Listed by</span><span class="meta-value" id="modal-owner"></span></div>
       </div>
       <div class="modal-note" id="modal-note" style="display:none"></div>
-      <div class="request-form">
+      <div class="request-form" id="request-form-section">
         <label>Send a swap request</label>
         <input type="text" id="req-name" placeholder="Your name *">
+        <input type="text" id="req-email" placeholder="Your email (shared with owner on accept) *">
         <input type="text" id="req-offer" placeholder="Book you're offering in return (optional)">
       </div>
+      <div id="contact-revealed" style="display:none"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-primary" id="request-btn" onclick="requestSwap()">Request this swap →</button>
       <button class="btn btn-secondary" onclick="closeModal()">Back</button>
     </div>
+  </div>
+</div>
+
+
+<!-- LANDING PAGE -->
+<div id="view-landing" class="view">
+  <div class="landing-hero">
+    <p class="landing-eyebrow">📍 UK book exchange — free, always</p>
+    <h1 class="landing-h1">Pass on<br>your last read.<br><em>Find your next.</em></h1>
+    <p class="landing-sub">Shelfswap is a free community for swapping books with people near you. No fees. No algorithms. Just books finding new homes.</p>
+    <div class="landing-ctas">
+      <button class="landing-cta-primary" onclick="showView('browse')">Browse books →</button>
+      <button class="landing-cta-secondary" onclick="openAuth()">Create account</button>
+    </div>
+  </div>
+  <div class="landing-features">
+    <div class="landing-feature">
+      <div class="feature-icon">📚</div>
+      <div class="feature-title">List in seconds</div>
+      <p class="feature-desc">Type a title or scan an ISBN. Your book is live instantly for anyone nearby to find.</p>
+    </div>
+    <div class="landing-feature">
+      <div class="feature-icon">🤝</div>
+      <div class="feature-title">Local swaps</div>
+      <p class="feature-desc">Meet locally or post. Every swap is between real people — no middleman, no commission.</p>
+    </div>
+    <div class="landing-feature">
+      <div class="feature-icon">🇬🇧</div>
+      <div class="feature-title">UK only</div>
+      <p class="feature-desc">Focused on the UK so swaps are practical. Your local community, not the whole internet.</p>
+    </div>
+    <div class="landing-feature">
+      <div class="feature-icon">♾️</div>
+      <div class="feature-title">Always free</div>
+      <p class="feature-desc">No listing fees, no subscription, no ads. Shelfswap is free because books should be shared.</p>
+    </div>
+  </div>
+  <div class="landing-stats">
+    <div><span class="landing-stat-num" id="landing-stat-books">—</span><span class="landing-stat-label">Books available</span></div>
+    <div><span class="landing-stat-num" id="landing-stat-swaps">—</span><span class="landing-stat-label">Swaps made</span></div>
+    <div><span class="landing-stat-num">Free</span><span class="landing-stat-label">Always</span></div>
+  </div>
+  <div class="landing-footer">
+    <p>© 2026 Shelfswap — UK book exchange</p>
+    <button class="landing-cta-secondary" style="padding:0.6rem 1.2rem;font-size:0.7rem" onclick="showView('browse')">Browse books →</button>
   </div>
 </div>
 
@@ -419,6 +498,15 @@ const db = {
       body: JSON.stringify(body)
     });
     if (!res.ok) { const e = await res.json(); return { error: e }; }
+    return { error: null };
+  },
+  async delete(table, id) {
+    const token = localStorage.getItem('ss_token') || SUPABASE_KEY;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token }
+    });
+    if (!res.ok) { try { const e = await res.json(); return { error: e }; } catch { return { error: { message: res.statusText } }; } }
     return { error: null };
   }
 };
@@ -538,9 +626,19 @@ function handleListClick() {
   showView('list');
 }
 
+function updateLandingStats() {
+  const bc = document.getElementById('stat-books')?.textContent;
+  const sc = document.getElementById('stat-swaps')?.textContent;
+  const lb = document.getElementById('landing-stat-books');
+  const ls = document.getElementById('landing-stat-swaps');
+  if (lb && bc) lb.textContent = bc;
+  if (ls && sc) ls.textContent = sc;
+}
+
 async function init() {
   renderSkeletons();
   await Promise.all([loadBooks(), loadStats(), checkSession()]);
+  updateLandingStats();
 }
 
 async function loadBooks() {
@@ -565,6 +663,7 @@ function showView(name) {
   if (name === 'browse') loadBooks();
   if (name === 'shelf') renderShelf();
   if (name === 'requests') loadRequests();
+  if (name === 'landing') updateLandingStats();
 }
 
 function renderSkeletons() {
@@ -595,22 +694,19 @@ function hashStr(s) {
   return h;
 }
 
-function bookCard(b) {
+function bookCard(b, showDelete=false) {
   const cc = b.condition === 'Like new' ? 'condition-new' : b.condition === 'Good' ? 'condition-good' : 'condition-loved';
   const col = GENRE_COLORS[b.genre] || '#7a6f62';
-  // Build Open Library cover search URL using title
-  const coverSearch = `https://covers.openlibrary.org/b/isbn/${(b.isbn||'').replace(/[^0-9X]/gi,'')}`;
-  const titleSlug = encodeURIComponent(b.title);
-  const authorSlug = encodeURIComponent(b.author);
   const imgId = 'cover-' + b.id;
   const placeholder = `<div class="book-cover-placeholder" style="background:linear-gradient(160deg,${col}22 0%,#1a1410 100%)">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="1.2" style="opacity:0.6;margin-bottom:0.5rem"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
     <span class="placeholder-title">${b.title}</span><span class="placeholder-author">${b.author}</span>
   </div>`;
-
-  return `<div class="book-card" onclick="openModal('${b.id}')">
+  const deleteBtn = showDelete ? `<button class="delete-btn" onclick="event.stopPropagation();deleteBook('${b.id}')">✕ Remove</button>` : '';
+  return `<div class="book-card" id="book-${b.id}" onclick="openModal('${b.id}')">
     <div id="${imgId}" style="width:100%;aspect-ratio:2/3;position:relative;overflow:hidden">
       ${placeholder}
+      ${deleteBtn}
     </div>
     <span class="post-badge ${b.will_post ? 'yes' : ''}">${b.will_post ? '✉ Post' : '📍 Local'}</span>
     <div class="book-info">
@@ -668,7 +764,10 @@ function openModal(id) {
   const n = document.getElementById('modal-note');
   if (currentBook.note) { n.textContent = '"' + currentBook.note + '"'; n.style.display = 'block'; } else { n.style.display = 'none'; }
   document.getElementById('req-name').value = '';
+  document.getElementById('req-email').value = '';
   document.getElementById('req-offer').value = '';
+  document.getElementById('contact-revealed').style.display = 'none';
+  document.getElementById('request-form-section').style.display = 'flex';
   const btn = document.getElementById('request-btn');
   btn.disabled = false; btn.textContent = 'Request this swap →';
   document.getElementById('modal').classList.add('open');
@@ -683,7 +782,9 @@ async function requestSwap() {
   if (!name) { showToast('Please enter your name', true); return; }
   const btn = document.getElementById('request-btn');
   btn.disabled = true; btn.textContent = 'Sending…';
-  const { error } = await db.insert('requests', { book_id: currentBook.id, from_name: name, offer_title: document.getElementById('req-offer').value.trim() || null, status: 'pending' });
+  const reqEmail = document.getElementById('req-email').value.trim();
+  if (!reqEmail) { showToast('Please enter your email', true); btn.disabled = false; btn.textContent = 'Request this swap →'; return; }
+  const { error } = await db.insert('requests', { book_id: currentBook.id, from_name: name, from_email: reqEmail, offer_title: document.getElementById('req-offer').value.trim() || null, status: 'pending' });
   if (error) { showToast('Could not send — try again', true); btn.disabled = false; btn.textContent = 'Request this swap →'; return; }
   closeModal();
   showToast('Swap request sent ✓');
@@ -746,6 +847,17 @@ async function submitBook() {
   setTimeout(() => showView('shelf'), 1000);
 }
 
+async function deleteBook(id) {
+  if (!confirm('Remove this book from Shelfswap?')) return;
+  const { error } = await db.delete('books', id);
+  if (error) { showToast('Could not remove — try again', true); return; }
+  allBooks = allBooks.filter(b => b.id !== id);
+  mySessionBooks = mySessionBooks.filter(b => b.id !== id);
+  document.getElementById('book-' + id)?.remove();
+  showToast('Book removed ✓');
+  document.getElementById('stat-books').textContent = allBooks.length;
+}
+
 async function renderShelf() {
   const grid = document.getElementById('my-shelf-grid');
   const empty = document.getElementById('shelf-empty');
@@ -763,7 +875,7 @@ async function renderShelf() {
     empty.style.display = 'block';
   } else {
     empty.style.display = 'none';
-    grid.innerHTML = books.map(b => bookCard(b)).join('');
+    grid.innerHTML = books.map(b => bookCard(b, true)).join('');
     loadCovers(books);
   }
 }
@@ -794,12 +906,26 @@ async function loadRequests() {
   updateReqCount(data.length);
 }
 
-async function handleRequest(id, status) {
+async function handleRequest(id, status, fromEmail, fromName) {
   const { error } = await db.update('requests', id, { status });
   if (error) { showToast('Could not update', true); return; }
-  if (status === 'accepted') { showToast('Swap accepted ✓'); const s = document.getElementById('stat-swaps'); s.textContent = (parseInt(s.textContent)||0)+1; }
-  else showToast('Request declined');
-  document.getElementById('req-'+id)?.remove();
+  if (status === 'accepted') {
+    showToast('Swap accepted ✓');
+    const s = document.getElementById('stat-swaps'); s.textContent = (parseInt(s.textContent)||0)+1;
+    // Replace the request card with contact details
+    const card = document.getElementById('req-'+id);
+    if (card) {
+      card.innerHTML = `<div style="width:100%">
+        <p style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--sage);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.5rem">✓ Swap accepted</p>
+        <p style="font-family:'Playfair Display',serif;font-size:1rem;font-style:italic;margin-bottom:0.3rem">${fromName}'s contact</p>
+        <p style="font-family:'DM Mono',monospace;font-size:0.8rem"><a href="mailto:${fromEmail}" style="color:var(--amber)">${fromEmail}</a></p>
+      </div>`;
+      card.style.borderColor = 'var(--sage)';
+    }
+  } else {
+    showToast('Request declined');
+    document.getElementById('req-'+id)?.remove();
+  }
   const rem = document.querySelectorAll('.request-card').length;
   if (!rem) document.getElementById('requests-empty').style.display = 'block';
   updateReqCount(rem);
