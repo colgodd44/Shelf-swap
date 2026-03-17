@@ -1652,13 +1652,19 @@ async function loadCovers(books) {
   for (const b of books) {
     const el = document.getElementById('cover-' + b.id);
     if (!el || el.querySelector('img')) continue;
-    // Use Open Library covers by ISBN — direct img tag, no API call, no rate limits
-    // Falls back to Google Books thumbnail URL if ISBN available
     if (b.isbn) {
       const img = new Image();
-      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0';
-      img.onload = () => { if (img.naturalWidth > 1) { el.style.position = 'relative'; el.innerHTML = ''; el.appendChild(img.cloneNode()); } };
-      img.onerror = () => { tryGoogleCover(el, b); };
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;z-index:2';
+      img.onload = () => {
+        if (img.naturalWidth > 1) {
+          el.style.position = 'relative';
+          // Remove only the placeholder, keep delete button
+          const placeholder = el.querySelector('.book-cover-placeholder');
+          if (placeholder) placeholder.remove();
+          el.insertBefore(img, el.firstChild);
+        }
+      };
+      img.onerror = () => tryGoogleCover(el, b);
       img.src = 'https://covers.openlibrary.org/b/isbn/' + b.isbn + '-M.jpg?default=false';
     } else {
       tryGoogleCover(el, b);
@@ -1666,19 +1672,25 @@ async function loadCovers(books) {
   }
 }
 
+
 async function tryGoogleCover(el, b) {
-  // Google Books Dynamic Links — returns JSON via JSONP-style, no CORS issues
   try {
-    const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent((b.isbn ? 'isbn:' + b.isbn : b.title + ' ' + b.author)) + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
+    const q = b.isbn ? 'isbn:' + b.isbn : encodeURIComponent(b.title + ' ' + b.author);
+    const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
     if (!res.ok) return;
     const data = await res.json();
     const thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail || data.items?.[0]?.volumeInfo?.imageLinks?.smallThumbnail;
     if (!thumb) return;
     const src = thumb.replace('http://', 'https://');
     const img = new Image();
-    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0';
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;z-index:2';
     img.src = src;
-    img.onload = () => { el.style.position = 'relative'; el.innerHTML = ''; el.appendChild(img); };
+    img.onload = () => {
+      el.style.position = 'relative';
+      const placeholder = el.querySelector('.book-cover-placeholder');
+      if (placeholder) placeholder.remove();
+      el.insertBefore(img, el.firstChild);
+    };
   } catch {}
 }
 
