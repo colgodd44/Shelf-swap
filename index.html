@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Shelfswap">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a1410'/><text y='.9em' font-size='80'>📚</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Mono:wght@300;400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 
@@ -916,11 +917,38 @@ function updateLandingStats() {
   if (ls && sc) ls.textContent = sc;
 }
 
+
+// ── EMAIL NOTIFICATIONS ───────────────────────────────────────────────────────
+const EMAILJS_PUBLIC_KEY = 'gzZEh-QnxF2n5lgTb';
+const EMAILJS_SERVICE_ID = 'service_oohm0mx';
+const EMAILJS_TEMPLATE_ID = 'template_ixntph2';
+
+function initEmailJS() {
+  if (window.emailjs) emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+}
+
+async function sendSwapNotification(ownerEmail, ownerName, requesterName, bookTitle, offerTitle) {
+  if (!window.emailjs) return;
+  try {
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email: ownerEmail,
+      to_name: ownerName || 'there',
+      from_name: requesterName,
+      book_title: bookTitle,
+      offer_title: offerTitle || 'nothing specific',
+    });
+    console.log('Notification sent');
+  } catch(e) {
+    console.log('Email failed:', e);
+  }
+}
+
 async function init() {
   showView('landing');
   renderSkeletons();
   await Promise.all([loadBooks(), loadStats(), checkSession()]);
   updateLandingStats();
+  initEmailJS();
 }
 
 async function loadBooks() {
@@ -1137,6 +1165,27 @@ async function requestSwap() {
   if (error) { showToast('Could not send — try again', true); btn.disabled = false; btn.textContent = 'Request this swap →'; return; }
   closeModal();
   showToast('Swap request sent ✓');
+
+  // Send email notification to book owner if we can find their email
+  if (currentBook) {
+    try {
+      // Look up owner's email via their user_id if available
+      if (currentBook.user_id) {
+        // We can't get email from auth directly with anon key
+        // But we can send to the owner_name — store requester details
+        // For now notify via the owner_name field stored on the book
+        // Owner will see it in Requests tab
+      }
+      // If current user is logged in, we have their details to send from
+      const reqName = document.getElementById('req-name')?.value || (currentUser?.user_metadata?.display_name || 'Someone');
+      const offerTitle = document.getElementById('req-offer')?.value || '';
+      // Send notification — owner email needs to be stored
+      // We'll use a lookup approach: find if owner has email stored
+      if (currentBook.owner_email) {
+        sendSwapNotification(currentBook.owner_email, currentBook.owner_name, reqName, currentBook.title, offerTitle);
+      }
+    } catch {}
+  }
 }
 
 function selectCondition(el, val) { selectedCondition = val; el.closest('.toggle-group').querySelectorAll('.toggle-option').forEach(b => b.classList.remove('active')); el.classList.add('active'); }
@@ -1266,7 +1315,7 @@ async function submitBook() {
       if (coords) { bookLat = coords.lat; bookLng = coords.lng; }
     } catch {}
   }
-  const payload = { title, author, genre: document.getElementById('book-genre').value || null, condition: selectedCondition, location, will_post: selectedWillPost, note: document.getElementById('book-note').value.trim() || null, owner_name: displayName, user_id: currentUser?.id || null, isbn: isbnVal, postcode: bookPostcode || null, lat: bookLat, lng: bookLng };
+  const payload = { title, author, genre: document.getElementById('book-genre').value || null, condition: selectedCondition, location, will_post: selectedWillPost, note: document.getElementById('book-note').value.trim() || null, owner_name: displayName, user_id: currentUser?.id || null, isbn: isbnVal, postcode: bookPostcode || null, lat: bookLat, lng: bookLng, owner_email: currentUser?.email || null };
   try {
     const res = await fetch(SUPABASE_URL + '/rest/v1/books', {
       method: 'POST',
