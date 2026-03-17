@@ -1549,7 +1549,7 @@ function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + name).classList.add('active');
   if (name === 'browse') loadBooks();
-  if (name === 'shelf') renderShelf();
+  if (name === 'shelf') renderShelf(true);
   if (name === 'requests') loadRequests();
   if (name === 'landing') updateLandingStats();
   if (name === 'profile') renderProfile();
@@ -1812,9 +1812,11 @@ async function submitBook() {
   setTimeout(() => showView('shelf'), 1000);
 }
 
-async function renderShelf() {
+async function renderShelf(force=false) {
   const grid = document.getElementById('my-shelf-grid');
   const empty = document.getElementById('shelf-empty');
+  // Don't re-render if covers are loading (has children and not forced)
+  if (!force && grid.children.length > 0 && grid.querySelector('.book-card')) return;
   if (!currentUser) {
     grid.innerHTML = '';
     empty.innerHTML = '<p>Sign in to see your listed books.</p><button class="submit-btn" style="max-width:200px;margin:0 auto" onclick="openAuth()">Sign in →</button>';
@@ -1856,7 +1858,7 @@ async function markSwapped(id) {
   if (error) { showToast('Could not update', true); return; }
   allBooks = allBooks.map(b => b.id === id ? {...b, is_swapped: true} : b);
   showToast('Marked as swapped ✓');
-  renderShelf();
+  renderShelf(true);
 }
 
 async function deleteBook(id) {
