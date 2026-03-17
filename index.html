@@ -1836,7 +1836,7 @@ async function renderShelf() {
       }
     }
   });
-  loadCovers(books);
+  setTimeout(() => loadCovers(books), 100);
 }
 
 async function markSwapped(id) {
