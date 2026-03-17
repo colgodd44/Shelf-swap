@@ -752,7 +752,7 @@ const db = {
   async select(table, params = {}) {
     let url = `${SUPABASE_URL}/rest/v1/${table}?`;
     if (params.select) url += `select=${params.select}&`;
-    if (params.filter) Object.entries(params.filter).forEach(([k,v]) => url += `${k}=eq.${encodeURIComponent(v)}&`);
+    if (params.filter) Object.entries(params.filter).forEach(([k,v]) => { const op = (v === true || v === false) ? 'is' : 'eq'; url += `${k}=${op}.${encodeURIComponent(v)}&`; });
     if (params.in) url += `${params.in.col}=in.(${params.in.vals.join(',')})&`;
     if (params.order) url += `order=${params.order}&`;
     if (params.limit) url += `limit=${params.limit}&`;
@@ -1668,7 +1668,8 @@ async function loadCovers(books) {
     const el = document.getElementById('cover-' + b.id);
     if (!el) continue;
     // Use cached cover if available
-    if (coverCache[b.id]) { applyCoverToEl(el, coverCache[b.id]); continue; }
+    if (coverCache[b.id] && coverCache[b.id] !== 'failed') { applyCoverToEl(el, coverCache[b.id]); continue; }
+    if (coverCache[b.id] === 'failed') continue;
     if (el.querySelector('img')) continue;
     // Use stored cover_url from database first (fastest, no API call)
     if (b.cover_url) {
@@ -1683,17 +1684,19 @@ async function loadCovers(books) {
 
 
 async function tryGoogleCover(el, b) {
+  // Only call Google Books if we haven't already tried for this book this session
+  if (coverCache[b.id] === 'failed') return;
   try {
     const q = b.isbn ? 'isbn:' + b.isbn : encodeURIComponent(b.title + ' ' + b.author);
     const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
-    if (!res.ok) return;
+    if (!res.ok) { coverCache[b.id] = 'failed'; return; }
     const data = await res.json();
     const thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail || data.items?.[0]?.volumeInfo?.imageLinks?.smallThumbnail;
-    if (!thumb) return;
+    if (!thumb) { coverCache[b.id] = 'failed'; return; }
     const src = thumb.replace('http://', 'https://');
     coverCache[b.id] = src;
     applyCoverToEl(el, src);
-  } catch {}
+  } catch { coverCache[b.id] = 'failed'; }
 }
 
 
