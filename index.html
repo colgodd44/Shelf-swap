@@ -1649,46 +1649,39 @@ function bookCard(b, showDelete=false) {
 }
 
 async function loadCovers(books) {
-  // Batch requests with a small delay to avoid rate limiting
   for (const b of books) {
     const el = document.getElementById('cover-' + b.id);
-    if (!el) continue;
-    // Skip if cover already loaded
-    if (el.querySelector('img')) continue;
-    try {
-      let thumb = null;
-      // Try ISBN first (most accurate)
-      if (b.isbn) {
-        const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + b.isbn + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
-        if (res.ok) {
-          const data = await res.json();
-          thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
-        }
-      }
-      // Fall back to title search
-      if (!thumb) {
-        const q = encodeURIComponent(b.title + (b.author ? ' ' + b.author : ''));
-        const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=3&fields=items(volumeInfo/imageLinks,volumeInfo/title)');
-        if (res.ok) {
-          const data = await res.json();
-          // Find best match — prefer exact title match
-          const items = data.items || [];
-          const exact = items.find(i => i.volumeInfo?.title?.toLowerCase().includes(b.title.toLowerCase()));
-          const best = exact || items[0];
-          thumb = best?.volumeInfo?.imageLinks?.thumbnail || best?.volumeInfo?.imageLinks?.smallThumbnail;
-        }
-      }
-      if (!thumb) continue;
-      const src = thumb.replace('http://', 'https://').replace('zoom=1', 'zoom=2');
+    if (!el || el.querySelector('img')) continue;
+    // Use Open Library covers by ISBN — direct img tag, no API call, no rate limits
+    // Falls back to Google Books thumbnail URL if ISBN available
+    if (b.isbn) {
       const img = new Image();
-      img.src = src;
       img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0';
-      img.onload = () => { el.style.position = 'relative'; el.innerHTML = ''; el.appendChild(img); };
-    } catch { /* keep placeholder */ }
-    // Small delay between requests to avoid hitting rate limits
-    await new Promise(r => setTimeout(r, 150));
+      img.onload = () => { if (img.naturalWidth > 1) { el.style.position = 'relative'; el.innerHTML = ''; el.appendChild(img.cloneNode()); } };
+      img.onerror = () => { tryGoogleCover(el, b); };
+      img.src = 'https://covers.openlibrary.org/b/isbn/' + b.isbn + '-M.jpg?default=false';
+    } else {
+      tryGoogleCover(el, b);
+    }
   }
 }
+
+async function tryGoogleCover(el, b) {
+  // Google Books Dynamic Links — returns JSON via JSONP-style, no CORS issues
+  try {
+    const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent((b.isbn ? 'isbn:' + b.isbn : b.title + ' ' + b.author)) + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
+    if (!res.ok) return;
+    const data = await res.json();
+    const thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail || data.items?.[0]?.volumeInfo?.imageLinks?.smallThumbnail;
+    if (!thumb) return;
+    const src = thumb.replace('http://', 'https://');
+    const img = new Image();
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0';
+    img.src = src;
+    img.onload = () => { el.style.position = 'relative'; el.innerHTML = ''; el.appendChild(img); };
+  } catch {}
+}
+
 
 function selectCondition(el, val) {
   window._selectedCondition = val;
