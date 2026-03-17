@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -301,6 +300,49 @@
   .lb-count-label { font-family:'DM Mono',monospace; font-size:0.55rem; color:var(--muted); letter-spacing:0.08em; text-transform:uppercase; display:block; text-align:right; }
   @media(max-width:700px) { .landing-two-col { grid-template-columns:1fr; } }
 
+
+  /* MESSAGING */
+  .messages-view { display:grid; grid-template-columns:300px 1fr; height:calc(100vh - 60px); }
+  .conv-list { border-right:1px solid var(--card-border); overflow-y:auto; }
+  .conv-list-header { padding:1.2rem 1.5rem; border-bottom:1px solid var(--card-border); font-family:'DM Mono',monospace; font-size:0.7rem; color:var(--muted); letter-spacing:0.12em; text-transform:uppercase; }
+  .conv-item { padding:1rem 1.5rem; border-bottom:1px solid var(--card-border); cursor:pointer; transition:background 0.15s; }
+  .conv-item:hover { background:rgba(255,255,255,0.02); }
+  .conv-item.active { background:rgba(200,133,58,0.06); border-left:2px solid var(--amber); }
+  .conv-item-book { font-family:'Playfair Display',serif; font-size:0.9rem; font-style:italic; margin-bottom:0.2rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .conv-item-meta { font-family:'DM Mono',monospace; font-size:0.62rem; color:var(--muted); letter-spacing:0.04em; }
+  .conv-item-unread { display:inline-block; width:8px; height:8px; background:var(--amber); border-radius:50%; margin-left:6px; vertical-align:middle; }
+  .chat-area { display:flex; flex-direction:column; }
+  .chat-header { padding:1rem 1.5rem; border-bottom:1px solid var(--card-border); display:flex; justify-content:space-between; align-items:center; }
+  .chat-header-title { font-family:'Playfair Display',serif; font-size:1rem; font-style:italic; }
+  .chat-header-meta { font-family:'DM Mono',monospace; font-size:0.62rem; color:var(--muted); letter-spacing:0.04em; }
+  .chat-messages { flex:1; overflow-y:auto; padding:1.5rem; display:flex; flex-direction:column; gap:0.75rem; }
+  .chat-empty { flex:1; display:flex; align-items:center; justify-content:center; }
+  .chat-empty p { font-family:'DM Mono',monospace; font-size:0.75rem; color:var(--muted); letter-spacing:0.06em; text-align:center; line-height:1.8; }
+  .msg { max-width:70%; display:flex; flex-direction:column; gap:0.2rem; }
+  .msg.mine { align-self:flex-end; align-items:flex-end; }
+  .msg.theirs { align-self:flex-start; align-items:flex-start; }
+  .msg-bubble { padding:0.7rem 1rem; font-family:'Libre Baskerville',serif; font-size:0.88rem; line-height:1.5; }
+  .msg.mine .msg-bubble { background:var(--amber); color:var(--ink); }
+  .msg.theirs .msg-bubble { background:var(--card-bg); border:1px solid var(--card-border); color:var(--paper); }
+  .msg-meta { font-family:'DM Mono',monospace; font-size:0.58rem; color:var(--muted); letter-spacing:0.04em; }
+  .chat-input-bar { padding:1rem 1.5rem; border-top:1px solid var(--card-border); display:flex; gap:0.75rem; }
+  .chat-input { flex:1; padding:0.75rem 1rem; background:var(--card-bg); border:1px solid var(--card-border); color:var(--paper); font-family:'Libre Baskerville',serif; font-size:0.9rem; outline:none; resize:none; transition:border-color 0.2s; }
+  .chat-input:focus { border-color:var(--amber); }
+  .chat-send-btn { padding:0.75rem 1.2rem; background:var(--amber); border:none; color:var(--ink); font-family:'DM Mono',monospace; font-size:0.7rem; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; transition:all 0.2s; flex-shrink:0; }
+  .chat-send-btn:hover { background:var(--highlight); }
+  .chat-send-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .no-conv-selected { flex:1; display:flex; align-items:center; justify-content:center; border-left:1px solid var(--card-border); }
+  .no-conv-selected p { font-family:'DM Mono',monospace; font-size:0.75rem; color:var(--muted); letter-spacing:0.06em; text-align:center; }
+  .conv-status-btn { padding:0.4rem 0.8rem; font-family:'DM Mono',monospace; font-size:0.6rem; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; border:1px solid var(--sage); color:var(--sage); background:transparent; transition:all 0.2s; }
+  .conv-status-btn:hover { background:var(--sage); color:var(--ink); }
+  @media(max-width:700px) {
+    .messages-view { grid-template-columns:1fr; }
+    .conv-list { display:none; height:auto; border-right:none; border-bottom:1px solid var(--card-border); }
+    .conv-list.mobile-show { display:block; }
+    .chat-area { display:none; }
+    .chat-area.mobile-show { display:flex; }
+  }
+
   @media(max-width:600px) {
     .hero-bar { padding:1.5rem 1rem; }
     .books-section { padding:1rem; }
@@ -310,7 +352,6 @@
     .list-view,.shelf-view { padding:1.5rem 1rem; }
   }
 </style>
-
 </head>
 <body>
 
@@ -321,6 +362,7 @@
     <button class="nav-btn" onclick="showView('shelf')">My Shelf</button>
     <button class="nav-btn" onclick="showView('requests')">Requests <span id="req-count" style="color:var(--amber)"></span></button>
     <button class="nav-btn" onclick="showView('wishlist')">Wishlist</button>
+    <button class="nav-btn" onclick="showView('messages')">Messages <span id="msg-count" style="color:var(--amber)"></span></button>
     <button class="nav-btn primary" onclick="handleListClick()">+ List a Book</button>
     <button class="nav-btn" id="profile-btn" onclick="showView('profile')">Profile</button>
     <button class="nav-btn" id="admin-btn" onclick="showView('admin')" style="display:none;color:var(--amber);border-color:var(--amber)">Admin</button><div id="auth-nav"></div>
@@ -328,7 +370,6 @@
 </nav>
 
 <!-- AUTH MODAL -->
-
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-box">
     <h2>Welcome back</h2>
@@ -346,7 +387,6 @@
 </div>
 
 <!-- BROWSE -->
-
 <div id="view-browse" class="view">
   <div class="hero-bar">
     <div>
@@ -399,7 +439,6 @@
 </div>
 
 <!-- LIST -->
-
 <div id="view-list" class="view">
   <div class="list-view">
     <h2>List a book</h2>
@@ -465,7 +504,6 @@
 </div>
 
 <!-- MY SHELF -->
-
 <div id="view-shelf" class="view">
   <div class="shelf-view">
     <h2>My shelf</h2>
@@ -479,7 +517,6 @@
 </div>
 
 <!-- REQUESTS -->
-
 <div id="view-requests" class="view">
   <div style="padding:2rem;max-width:700px">
     <h2 style="font-family:'Playfair Display',serif;font-size:2rem;font-style:italic;margin-bottom:0.4rem">Swap requests</h2>
@@ -492,7 +529,6 @@
 </div>
 
 <!-- MODAL -->
-
 <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
   <div class="modal">
     <div class="modal-header">
@@ -515,20 +551,21 @@
         <label>Send a swap request</label>
         <input type="text" id="req-name" placeholder="Your name *">
         <input type="text" id="req-email" placeholder="Your email (shared with owner on accept) *">
-        <input type="text" id="req-offer" placeholder="Book you're offering in return (optional)">
+        <input type="text" id="req-offer" placeholder="Opening message (optional)">
       </div>
       <div id="contact-revealed" style="display:none"></div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-primary" id="request-btn" onclick="requestSwap()">Request this swap →</button>
+      <button class="btn btn-primary" id="request-btn" onclick="requestSwap()">Start swap chat →</button>
       <button class="btn btn-secondary" onclick="shareBook()" id="share-btn">Share</button>
       <button class="btn btn-secondary" onclick="closeModal()">Back</button>
     </div>
   </div>
 </div>
 
-<!-- PROFILE VIEW -->
 
+
+<!-- PROFILE VIEW -->
 <div id="view-profile" class="view">
   <div style="max-width:600px;margin:0 auto;padding:2.5rem 2rem">
     <h2 style="font-family:'Playfair Display',serif;font-size:2rem;font-style:italic;margin-bottom:0.4rem">My profile</h2>
@@ -537,83 +574,90 @@
   </div>
 </div>
 
-<!-- WISHLIST VIEW -->
 
+
+
+<!-- MESSAGES VIEW -->
+<div id="view-messages" class="view">
+  <div class="messages-view">
+    <div class="conv-list" id="conv-list">
+      <div class="conv-list-header">Conversations</div>
+      <div id="conv-list-items"></div>
+    </div>
+    <div id="chat-area-wrap" class="no-conv-selected">
+      <p>Select a conversation<br>to start messaging</p>
+    </div>
+  </div>
+</div>
+
+<!-- WISHLIST VIEW -->
 <div id="view-wishlist" class="view">
   <div class="wishlist-view">
     <h2>My wishlist</h2>
     <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2rem">Books you're looking for</p>
 
-```
-<div class="wishlist-add-form" id="wishlist-add-section">
-  <h3>Add a book you want</h3>
-  <div class="form-row" style="margin-bottom:1rem">
-    <div class="form-group" style="margin-bottom:0">
-      <label class="form-label">Title *</label>
-      <input class="form-input" id="wish-title" type="text" placeholder="Book title">
+    <div class="wishlist-add-form" id="wishlist-add-section">
+      <h3>Add a book you want</h3>
+      <div class="form-row" style="margin-bottom:1rem">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Title *</label>
+          <input class="form-input" id="wish-title" type="text" placeholder="Book title">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Author</label>
+          <input class="form-input" id="wish-author" type="text" placeholder="Author name">
+        </div>
+      </div>
+      <button class="submit-btn" style="margin-top:0" onclick="addToWishlist()">Add to wishlist →</button>
     </div>
-    <div class="form-group" style="margin-bottom:0">
-      <label class="form-label">Author</label>
-      <input class="form-input" id="wish-author" type="text" placeholder="Author name">
+
+    <div id="wishlist-items"></div>
+
+    <div class="wanted-section">
+      <h3>What others are looking for</h3>
+      <div id="wanted-tags"></div>
     </div>
-  </div>
-  <button class="submit-btn" style="margin-top:0" onclick="addToWishlist()">Add to wishlist →</button>
-</div>
-
-<div id="wishlist-items"></div>
-
-<div class="wanted-section">
-  <h3>What others are looking for</h3>
-  <div id="wanted-tags"></div>
-</div>
-```
-
   </div>
 </div>
 
 <!-- ADMIN VIEW -->
-
 <div id="view-admin" class="view">
   <div class="admin-view">
     <h2>Admin dashboard</h2>
     <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2rem">Shelfswap — live stats</p>
 
-```
-<div class="admin-grid" id="admin-stats-grid">
-  <div class="admin-stat"><span class="admin-stat-num" id="as-books">—</span><span class="admin-stat-label">Books listed</span></div>
-  <div class="admin-stat"><span class="admin-stat-num" id="as-users">—</span><span class="admin-stat-label">Users</span></div>
-  <div class="admin-stat"><span class="admin-stat-num" id="as-swaps">—</span><span class="admin-stat-label">Swaps completed</span></div>
-  <div class="admin-stat"><span class="admin-stat-num" id="as-requests">—</span><span class="admin-stat-label">Pending requests</span></div>
-  <div class="admin-stat"><span class="admin-stat-num" id="as-today">—</span><span class="admin-stat-label">Listed today</span></div>
-  <div class="admin-stat"><span class="admin-stat-num" id="as-available">—</span><span class="admin-stat-label">Available now</span></div>
-</div>
+    <div class="admin-grid" id="admin-stats-grid">
+      <div class="admin-stat"><span class="admin-stat-num" id="as-books">—</span><span class="admin-stat-label">Books listed</span></div>
+      <div class="admin-stat"><span class="admin-stat-num" id="as-users">—</span><span class="admin-stat-label">Users</span></div>
+      <div class="admin-stat"><span class="admin-stat-num" id="as-swaps">—</span><span class="admin-stat-label">Swaps completed</span></div>
+      <div class="admin-stat"><span class="admin-stat-num" id="as-requests">—</span><span class="admin-stat-label">Pending requests</span></div>
+      <div class="admin-stat"><span class="admin-stat-num" id="as-today">—</span><span class="admin-stat-label">Listed today</span></div>
+      <div class="admin-stat"><span class="admin-stat-num" id="as-available">—</span><span class="admin-stat-label">Available now</span></div>
+    </div>
 
-<div class="admin-section">
-  <h3>Books by genre</h3>
-  <div class="admin-bar-wrap" id="admin-genres"></div>
-</div>
+    <div class="admin-section">
+      <h3>Books by genre</h3>
+      <div class="admin-bar-wrap" id="admin-genres"></div>
+    </div>
 
-<div class="admin-section">
-  <h3>Top locations</h3>
-  <div class="admin-bar-wrap" id="admin-locations"></div>
-</div>
+    <div class="admin-section">
+      <h3>Top locations</h3>
+      <div class="admin-bar-wrap" id="admin-locations"></div>
+    </div>
 
-<div class="admin-section">
-  <h3>All books</h3>
-  <div style="overflow-x:auto">
-    <table class="admin-table">
-      <thead><tr><th>Title</th><th>Author</th><th>Location</th><th>Owner</th><th>Condition</th><th>Status</th><th></th></tr></thead>
-      <tbody id="admin-books-table"></tbody>
-    </table>
-  </div>
-</div>
-```
-
+    <div class="admin-section">
+      <h3>All books</h3>
+      <div style="overflow-x:auto">
+        <table class="admin-table">
+          <thead><tr><th>Title</th><th>Author</th><th>Location</th><th>Owner</th><th>Condition</th><th>Status</th><th></th></tr></thead>
+          <tbody id="admin-books-table"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
 <!-- LANDING PAGE -->
-
 <div id="view-landing" class="view">
   <div class="landing-hero">
     <p class="landing-eyebrow">📍 UK book exchange — free, always</p>
@@ -765,6 +809,241 @@ let selectedWillPost = false;
 
 
 
+
+
+
+// ── MESSAGING ─────────────────────────────────────────────────────────────────
+let currentConvId = null;
+let pollTimer = null;
+
+async function loadMessages() {
+  if (!currentUser) {
+    document.getElementById('conv-list-items').innerHTML = '<div style="padding:1.5rem"><p style="font-family:monospace;font-size:0.75rem;color:var(--muted)">Sign in to view messages.</p></div>';
+    return;
+  }
+  await loadConversations();
+  updateMsgCount();
+}
+
+async function loadConversations() {
+  const token = localStorage.getItem('ss_token') || SUPABASE_KEY;
+  // Get conversations where user is requester or owner
+  const res1 = await fetch(`${SUPABASE_URL}/rest/v1/conversations?requester_id=eq.${currentUser.id}&order=updated_at.desc`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, Accept: 'application/json' }
+  });
+  const res2 = await fetch(`${SUPABASE_URL}/rest/v1/conversations?owner_id=eq.${currentUser.id}&order=updated_at.desc`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, Accept: 'application/json' }
+  });
+  const d1 = res1.ok ? await res1.json() : [];
+  const d2 = res2.ok ? await res2.json() : [];
+  const convs = [...d1, ...d2].sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+  const el = document.getElementById('conv-list-items');
+  if (!convs.length) {
+    el.innerHTML = '<div style="padding:1.5rem"><p style="font-family:monospace;font-size:0.75rem;color:var(--muted);line-height:1.7">No conversations yet.<br>Request a swap to start chatting.</p></div>';
+    return;
+  }
+
+  el.innerHTML = convs.map(c => {
+    const other = c.requester_id === currentUser.id ? c.owner_name : c.requester_name;
+    return `<div class="conv-item ${c.id === currentConvId ? 'active' : ''}" onclick="openConversation('${c.id}', ${JSON.stringify(c).replace(/'/g, "&#39;")})">
+      <div class="conv-item-book">${c.book_title || 'Unknown book'}</div>
+      <div class="conv-item-meta">with ${other} · ${c.status}</div>
+    </div>`;
+  }).join('');
+}
+
+async function openConversation(id, conv) {
+  currentConvId = id;
+  if (pollTimer) clearInterval(pollTimer);
+
+  // Mark active in list
+  document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.conv-item[onclick*="${id}"]`)?.classList.add('active');
+
+  const isOwner = conv.owner_id === currentUser.id;
+  const other = isOwner ? conv.requester_name : conv.owner_name;
+
+  const wrap = document.getElementById('chat-area-wrap');
+  wrap.className = 'chat-area';
+  wrap.innerHTML = `
+    <div class="chat-header">
+      <div>
+        <div class="chat-header-title">${conv.book_title}</div>
+        <div class="chat-header-meta">Swap with ${other}</div>
+      </div>
+      ${isOwner && conv.status === 'active' ? `<button class="conv-status-btn" onclick="acceptSwapConv('${id}')">Accept swap ✓</button>` : ''}
+    </div>
+    <div class="chat-messages" id="chat-msgs-${id}"></div>
+    <div class="chat-input-bar">
+      <textarea class="chat-input" id="chat-input-${id}" placeholder="Type a message…" rows="1" onkeydown="handleChatKey(event, '${id}')"></textarea>
+      <button class="chat-send-btn" onclick="sendMessage('${id}')">Send</button>
+    </div>
+  `;
+
+  await fetchMessages(id);
+  // Poll for new messages every 4 seconds
+  pollTimer = setInterval(() => fetchMessages(id), 4000);
+}
+
+async function fetchMessages(convId) {
+  const token = localStorage.getItem('ss_token') || SUPABASE_KEY;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/messages?conversation_id=eq.${convId}&order=created_at.asc`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, Accept: 'application/json' }
+  });
+  if (!res.ok) return;
+  const msgs = await res.json();
+  const el = document.getElementById('chat-msgs-' + convId);
+  if (!el) return;
+
+  if (!msgs.length) {
+    el.innerHTML = '<div class="chat-empty"><p>No messages yet.<br>Say hello!</p></div>';
+    return;
+  }
+
+  const html = msgs.map(m => {
+    const mine = m.sender_id === currentUser.id;
+    return `<div class="msg ${mine ? 'mine' : 'theirs'}">
+      <div class="msg-bubble">${escapeHtml(m.content)}</div>
+      <div class="msg-meta">${mine ? 'You' : m.sender_name} · ${timeAgo(m.created_at)}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = html;
+  el.scrollTop = el.scrollHeight;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function sendMessage(convId) {
+  const input = document.getElementById('chat-input-' + convId);
+  if (!input) return;
+  const content = input.value.trim();
+  if (!content) return;
+
+  const btn = document.querySelector('.chat-send-btn');
+  if (btn) btn.disabled = true;
+  input.value = '';
+
+  const token = localStorage.getItem('ss_token') || SUPABASE_KEY;
+  await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      conversation_id: convId,
+      sender_id: currentUser.id,
+      sender_name: currentUser.user_metadata?.display_name || currentUser.email.split('@')[0],
+      content
+    })
+  });
+
+  // Update conversation updated_at
+  await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${convId}`, {
+    method: 'PATCH',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ updated_at: new Date().toISOString() })
+  });
+
+  if (btn) btn.disabled = false;
+  await fetchMessages(convId);
+}
+
+function handleChatKey(e, convId) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage(convId);
+  }
+}
+
+async function acceptSwapConv(convId) {
+  const token = localStorage.getItem('ss_token') || SUPABASE_KEY;
+  await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${convId}`, {
+    method: 'PATCH',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'accepted' })
+  });
+  // Send a system message
+  await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      conversation_id: convId,
+      sender_id: currentUser.id,
+      sender_name: 'Shelfswap',
+      content: '✓ Swap accepted! You can now arrange to meet or post the book.'
+    })
+  });
+  showToast('Swap accepted ✓');
+  await openConversation(convId, { id: convId, status: 'accepted', owner_id: currentUser.id });
+}
+
+async function startConversation(book) {
+  if (!currentUser) { openAuth(); return; }
+  if (book.user_id === currentUser.id) { showToast('This is your own book', true); return; }
+
+  const token = localStorage.getItem('ss_token') || SUPABASE_KEY;
+  // Check if conversation already exists
+  const existing = await fetch(`${SUPABASE_URL}/rest/v1/conversations?book_id=eq.${book.id}&requester_id=eq.${currentUser.id}`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, Accept: 'application/json' }
+  });
+  const existingData = existing.ok ? await existing.json() : [];
+  if (existingData.length > 0) {
+    showView('messages');
+    setTimeout(() => openConversation(existingData[0].id, existingData[0]), 300);
+    return;
+  }
+
+  // Create new conversation
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({
+      book_id: book.id,
+      book_title: book.title,
+      requester_id: currentUser.id,
+      requester_name: currentUser.user_metadata?.display_name || currentUser.email.split('@')[0],
+      owner_id: book.user_id,
+      owner_name: book.owner_name,
+      status: 'active'
+    })
+  });
+
+  if (!res.ok) { showToast('Could not start conversation', true); return; }
+  const data = await res.json();
+  const conv = Array.isArray(data) ? data[0] : data;
+
+  // Send opening message if provided
+  const offerText = document.getElementById('req-offer')?.value.trim();
+  const openingMsg = offerText || ('Hi! I would love to swap for your copy of ' + book.title);
+  await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      conversation_id: conv.id,
+      sender_id: currentUser.id,
+      sender_name: currentUser.user_metadata?.display_name || currentUser.email.split('@')[0],
+      content: openingMsg
+    })
+  });
+
+  closeModal();
+  showToast('Conversation started ✓');
+  showView('messages');
+  setTimeout(() => openConversation(conv.id, conv), 400);
+}
+
+async function updateMsgCount() {
+  if (!currentUser) return;
+  const token = localStorage.getItem('ss_token') || SUPABASE_KEY;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations?owner_id=eq.${currentUser.id}&status=eq.active`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, Accept: 'application/json' }
+  });
+  const data = res.ok ? await res.json() : [];
+  const el = document.getElementById('msg-count');
+  if (el) el.textContent = data.length ? '(' + data.length + ')' : '';
+}
 
 
 // ── FEED & LEADERBOARD ────────────────────────────────────────────────────────
@@ -1276,6 +1555,7 @@ function showView(name) {
   if (name === 'profile') renderProfile();
   if (name === 'admin') loadAdminDashboard();
   if (name === 'wishlist') loadWishlist();
+  if (name === 'messages') { loadMessages(); if (pollTimer && name !== 'messages') { clearInterval(pollTimer); pollTimer = null; } }
 }
 
 async function renderProfile() {
@@ -1466,26 +1746,7 @@ async function requestSwap() {
   closeModal();
   showToast('Swap request sent ✓');
 
-  // Send email notification to book owner if we can find their email
-  if (currentBook) {
-    try {
-      // Look up owner's email via their user_id if available
-      if (currentBook.user_id) {
-        // We can't get email from auth directly with anon key
-        // But we can send to the owner_name — store requester details
-        // For now notify via the owner_name field stored on the book
-        // Owner will see it in Requests tab
-      }
-      // If current user is logged in, we have their details to send from
-      const reqName = document.getElementById('req-name')?.value || (currentUser?.user_metadata?.display_name || 'Someone');
-      const offerTitle = document.getElementById('req-offer')?.value || '';
-      // Send notification — owner email needs to be stored
-      // We'll use a lookup approach: find if owner has email stored
-      if (currentBook.owner_email) {
-        sendSwapNotification(currentBook.owner_email, currentBook.owner_name, reqName, currentBook.title, offerTitle);
-      }
-    } catch {}
-  }
+
 }
 
 function selectCondition(el, val) { selectedCondition = val; el.closest('.toggle-group').querySelectorAll('.toggle-option').forEach(b => b.classList.remove('active')); el.classList.add('active'); }
@@ -1781,6 +2042,5 @@ function showToast(msg, isError=false) {
 
 init();
 </script>
-
 </body>
 </html>
