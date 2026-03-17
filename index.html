@@ -802,6 +802,7 @@ const GENRE_COLORS = { 'Fiction':'#c8853a','Non-fiction':'#5a6b52','Sci-fi':'#4a
 
 let allBooks = [];
 let mySessionBooks = [];
+const coverCache = {}; // cache cover URLs by book id
 let currentBook = null;
 let selectedCondition = 'Like new';
 let selectedWillPost = false;
@@ -1648,24 +1649,38 @@ function bookCard(b, showDelete=false) {
   </div>`;
 }
 
+function applyCoverToEl(el, src) {
+  const img = new Image();
+  img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;z-index:2';
+  img.src = src;
+  img.onload = () => {
+    if (img.naturalWidth > 1) {
+      el.style.position = 'relative';
+      const placeholder = el.querySelector('.book-cover-placeholder');
+      if (placeholder) placeholder.remove();
+      if (!el.querySelector('img')) el.insertBefore(img, el.firstChild);
+    }
+  };
+}
+
 async function loadCovers(books) {
   for (const b of books) {
     const el = document.getElementById('cover-' + b.id);
-    if (!el || el.querySelector('img')) continue;
+    if (!el) continue;
+    // Use cached cover if available
+    if (coverCache[b.id]) { applyCoverToEl(el, coverCache[b.id]); continue; }
+    if (el.querySelector('img')) continue;
     if (b.isbn) {
+      const src = 'https://covers.openlibrary.org/b/isbn/' + b.isbn + '-M.jpg?default=false';
       const img = new Image();
-      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;z-index:2';
       img.onload = () => {
         if (img.naturalWidth > 1) {
-          el.style.position = 'relative';
-          // Remove only the placeholder, keep delete button
-          const placeholder = el.querySelector('.book-cover-placeholder');
-          if (placeholder) placeholder.remove();
-          el.insertBefore(img, el.firstChild);
-        }
+          coverCache[b.id] = src;
+          applyCoverToEl(el, src);
+        } else { tryGoogleCover(el, b); }
       };
       img.onerror = () => tryGoogleCover(el, b);
-      img.src = 'https://covers.openlibrary.org/b/isbn/' + b.isbn + '-M.jpg?default=false';
+      img.src = src;
     } else {
       tryGoogleCover(el, b);
     }
@@ -1682,15 +1697,8 @@ async function tryGoogleCover(el, b) {
     const thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail || data.items?.[0]?.volumeInfo?.imageLinks?.smallThumbnail;
     if (!thumb) return;
     const src = thumb.replace('http://', 'https://');
-    const img = new Image();
-    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;z-index:2';
-    img.src = src;
-    img.onload = () => {
-      el.style.position = 'relative';
-      const placeholder = el.querySelector('.book-cover-placeholder');
-      if (placeholder) placeholder.remove();
-      el.insertBefore(img, el.firstChild);
-    };
+    coverCache[b.id] = src;
+    applyCoverToEl(el, src);
   } catch {}
 }
 
