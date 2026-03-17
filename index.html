@@ -1664,10 +1664,8 @@ function applyCoverToEl(el, src) {
 }
 
 async function loadCovers(books) {
-  console.log('loadCovers called with', books.length, 'books');
   for (const b of books) {
     const el = document.getElementById('cover-' + b.id);
-    console.log('book:', b.title, 'el found:', !!el, 'cover_url:', b.cover_url, 'isbn:', b.isbn);
     if (!el) continue;
     // Use cached cover if available
     if (coverCache[b.id]) { applyCoverToEl(el, coverCache[b.id]); continue; }
@@ -1678,20 +1676,8 @@ async function loadCovers(books) {
       applyCoverToEl(el, b.cover_url);
       continue;
     }
-    if (b.isbn) {
-      const src = 'https://covers.openlibrary.org/b/isbn/' + b.isbn + '-M.jpg?default=false';
-      const img = new Image();
-      img.onload = () => {
-        if (img.naturalWidth > 1) {
-          coverCache[b.id] = src;
-          applyCoverToEl(el, src);
-        } else { tryGoogleCover(el, b); }
-      };
-      img.onerror = () => tryGoogleCover(el, b);
-      img.src = src;
-    } else {
-      tryGoogleCover(el, b);
-    }
+    // Always try Google Books for most reliable results
+    tryGoogleCover(el, b);
   }
 }
 
