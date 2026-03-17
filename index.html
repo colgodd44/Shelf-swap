@@ -1628,6 +1628,9 @@ function bookCard(b, showDelete=false) {
   const cc = b.condition === 'Like new' ? 'condition-new' : b.condition === 'Good' ? 'condition-good' : 'condition-loved';
   const col = GENRE_COLORS[b.genre] || '#7a6f62';
   const imgId = 'cover-' + b.id;
+  // Use stored cover_url or cached cover directly in HTML — no async needed
+  const coverSrc = b.cover_url || coverCache[b.id];
+  const coverImg = (coverSrc && coverSrc !== 'failed') ? `<img src="${coverSrc}" style="width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;z-index:2" onerror="this.style.display='none'">` : '';
   const placeholder = `<div class="book-cover-placeholder" style="background:linear-gradient(160deg,${col}22 0%,#1a1410 100%)">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="1.2" style="opacity:0.6;margin-bottom:0.5rem"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
     <span class="placeholder-title">${b.title}</span><span class="placeholder-author">${b.author}</span>
@@ -1636,6 +1639,7 @@ function bookCard(b, showDelete=false) {
   const swappedOverlay = b.is_swapped ? `<div class="swapped-overlay"><span class="swapped-label">✓ Swapped</span></div>` : '';
   return `<div class="book-card" id="book-${b.id}" onclick="openModal('${b.id}')">
     <div id="${imgId}" style="width:100%;aspect-ratio:2/3;position:relative;overflow:hidden">
+      ${coverImg}
       ${placeholder}
       ${deleteBtn}
       ${swappedOverlay}
