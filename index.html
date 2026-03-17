@@ -1902,6 +1902,46 @@ function showToast(msg, isError=false) {
 }
 
 
+
+function openModal(id) {
+  currentBook = allBooks.find(b => b.id === id);
+  if (!currentBook) return;
+  document.getElementById('modal-genre').textContent = currentBook.genre || '';
+  document.getElementById('modal-title').textContent = currentBook.title;
+  document.getElementById('modal-author').textContent = currentBook.author;
+  document.getElementById('modal-condition').textContent = currentBook.condition;
+  document.getElementById('modal-location').textContent = currentBook.location;
+  document.getElementById('modal-post').textContent = currentBook.will_post ? 'Yes, happy to post' : 'Local only';
+  document.getElementById('modal-owner').textContent = currentBook.owner_name || 'Anonymous';
+  const n = document.getElementById('modal-note');
+  if (currentBook.note) { n.textContent = '"' + currentBook.note + '"'; n.style.display = 'block'; } else { n.style.display = 'none'; }
+  const reqForm = document.getElementById('request-form-section');
+  const contactRevealed = document.getElementById('contact-revealed');
+  if (reqForm) reqForm.style.display = 'flex';
+  if (contactRevealed) contactRevealed.style.display = 'none';
+  document.getElementById('req-name') && (document.getElementById('req-name').value = '');
+  document.getElementById('req-email') && (document.getElementById('req-email').value = '');
+  document.getElementById('req-offer') && (document.getElementById('req-offer').value = '');
+  const btn = document.getElementById('request-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Start swap chat →'; }
+  document.getElementById('modal').classList.add('open');
+}
+
+function shareBook() {
+  if (!currentBook) return;
+  const text = 'Check out "' + currentBook.title + '" by ' + currentBook.author + ' on Shelfswap — free UK book exchange';
+  const url = 'https://www.shelfswap.online';
+  if (navigator.share) {
+    navigator.share({ title: currentBook.title, text, url }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(text + '\n' + url).then(() => showToast('Link copied ✓')).catch(() => showToast('Could not copy', true));
+  }
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); currentBook = null; }
+function closeModalOutside(e) { if (e.target === document.getElementById('modal')) closeModal(); }
+
+
 init();
 </script>
 </body>
