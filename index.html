@@ -730,11 +730,14 @@ async function checkSession() {
 
 function updateAuthNav() {
   const el = document.getElementById('auth-nav');
+  const adminBtn = document.getElementById('admin-btn');
   if (currentUser) {
     const name = currentUser.user_metadata?.display_name || currentUser.email.split('@')[0];
     el.innerHTML = '<span class="user-badge">' + name + '</span><button class="nav-btn" onclick="signOut()" style="margin-left:0.5rem">Sign out</button>';
+    if (adminBtn) adminBtn.style.display = currentUser.email === ADMIN_EMAIL ? 'block' : 'none';
   } else {
     el.innerHTML = '<button class="nav-btn" onclick="openAuth()">Sign in</button>';
+    if (adminBtn) adminBtn.style.display = 'none';
   }
 }
 
