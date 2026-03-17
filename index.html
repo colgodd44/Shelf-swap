@@ -1650,55 +1650,110 @@ function bookCard(b, showDelete=false) {
 }
 
 function applyCoverToEl(el, src) {
+  if (!src || el.querySelector('img')) return;
   const img = new Image();
   img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;z-index:2';
   img.src = src;
   img.onload = () => {
-    if (img.naturalWidth > 1) {
+    if (img.naturalWidth > 10) {
       el.style.position = 'relative';
-      const placeholder = el.querySelector('.book-cover-placeholder');
-      if (placeholder) placeholder.remove();
+      const ph = el.querySelector('.book-cover-placeholder');
+      if (ph) ph.style.display = 'none';
       if (!el.querySelector('img')) el.insertBefore(img, el.firstChild);
     }
   };
 }
 
-async function loadCovers(books) {
-  for (const b of books) {
+function loadCovers(books) {
+  books.forEach(b => {
     const el = document.getElementById('cover-' + b.id);
-    if (!el) continue;
-    // Use cached cover if available
-    if (coverCache[b.id] && coverCache[b.id] !== 'failed') { applyCoverToEl(el, coverCache[b.id]); continue; }
-    if (coverCache[b.id] === 'failed') continue;
-    if (el.querySelector('img')) continue;
-    // Use stored cover_url from database first (fastest, no API call)
-    if (b.cover_url) {
+    if (!el || el.querySelector('img')) return;
+    // 1. Use stored cover_url (fastest, no API)
+    if (b.cover_url && coverCache[b.id] !== 'failed') {
       coverCache[b.id] = b.cover_url;
       applyCoverToEl(el, b.cover_url);
-      continue;
+      return;
     }
-    // Always try Google Books for most reliable results
-    tryGoogleCover(el, b);
+    // 2. Use cached URL
+    if (coverCache[b.id] && coverCache[b.id] !== 'failed') {
+      applyCoverToEl(el, coverCache[b.id]);
+      return;
+    }
+    if (coverCache[b.id] === 'failed') return;
+    // 3. Direct Open Library img by ISBN - no fetch, no rate limit
+    if (b.isbn) {
+      const src = 'https://covers.openlibrary.org/b/isbn/' + b.isbn.replace(/[^0-9X]/gi,'') + '-M.jpg';
+      const test = new Image();
+      test.onload = () => {
+        if (test.naturalWidth > 10) { coverCache[b.id] = src; applyCoverToEl(el, src); }
+        else { coverCache[b.id] = 'failed'; }
+      };
+      test.onerror = () => { coverCache[b.id] = 'failed'; };
+      test.src = src;
+    }
+    // No isbn and no stored url = keep placeholder
+  });
+}
+
+function filterBooks() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const genre = document.getElementById('genre-filter').value;
+  const post = document.getElementById('post-filter').value;
+  window._userRadius = parseInt(document.getElementById('radius-select')?.value) || 10;
+  let filtered = allBooks.filter(b => {
+    const mq = !q || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q) || (b.genre||'').toLowerCase().includes(q);
+    const mg = !genre || b.genre === genre;
+    const mp = !post || (post === 'post' ? b.will_post : !b.will_post);
+    return mq && mg && mp;
+  });
+  if (userLat && userLng && window._userRadius > 0) {
+    filtered = filtered.filter(b => {
+      if (!b.lat || !b.lng) return true;
+      const dist = haversineDistance(userLat, userLng, b.lat, b.lng);
+      b._distance = dist;
+      return dist <= window._userRadius;
+    });
+    filtered.sort((a, b) => (a._distance || 999) - (b._distance || 999));
   }
+  renderBooks(filtered);
 }
 
-
-async function tryGoogleCover(el, b) {
-  // Only call Google Books if we haven't already tried for this book this session
-  if (coverCache[b.id] === 'failed') return;
-  try {
-    const q = b.isbn ? 'isbn:' + b.isbn : encodeURIComponent(b.title + ' ' + b.author);
-    const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
-    if (!res.ok) { coverCache[b.id] = 'failed'; return; }
-    const data = await res.json();
-    const thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail || data.items?.[0]?.volumeInfo?.imageLinks?.smallThumbnail;
-    if (!thumb) { coverCache[b.id] = 'failed'; return; }
-    const src = thumb.replace('http://', 'https://');
-    coverCache[b.id] = src;
-    applyCoverToEl(el, src);
-  } catch { coverCache[b.id] = 'failed'; }
+function openModal(id) {
+  currentBook = allBooks.find(b => b.id === id);
+  if (!currentBook) return;
+  document.getElementById('modal-genre').textContent = currentBook.genre || '';
+  document.getElementById('modal-title').textContent = currentBook.title;
+  document.getElementById('modal-author').textContent = currentBook.author;
+  document.getElementById('modal-condition').textContent = currentBook.condition;
+  document.getElementById('modal-location').textContent = currentBook.location;
+  document.getElementById('modal-post').textContent = currentBook.will_post ? 'Yes, happy to post' : 'Local only';
+  document.getElementById('modal-owner').textContent = currentBook.owner_name || 'Anonymous';
+  const n = document.getElementById('modal-note');
+  if (currentBook.note) { n.textContent = '"' + currentBook.note + '"'; n.style.display = 'block'; } else { n.style.display = 'none'; }
+  const btn = document.getElementById('request-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Start swap chat →'; }
+  document.getElementById('modal').classList.add('open');
 }
 
+function shareBook() {
+  if (!currentBook) return;
+  const text = 'Check out "' + currentBook.title + '" by ' + currentBook.author + ' on Shelfswap';
+  const url = 'https://www.shelfswap.online';
+  if (navigator.share) { navigator.share({ title: currentBook.title, text, url }).catch(() => {}); }
+  else { navigator.clipboard.writeText(text + '\n' + url).then(() => showToast('Link copied ✓')).catch(() => {}); }
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); currentBook = null; }
+function closeModalOutside(e) { if (e.target === document.getElementById('modal')) closeModal(); }
+
+async function requestSwap() {
+  if (!currentUser) { openAuth(); showToast('Sign in to request a swap', false); return; }
+  if (!currentBook) return;
+  const btn = document.getElementById('request-btn');
+  btn.disabled = true; btn.textContent = 'Starting chat…';
+  await startConversation(currentBook);
+  btn.disabled = false; btn.textContent = 'Start swap chat →';
+}
 
 function selectCondition(el, val) {
   window._selectedCondition = val;
@@ -1724,13 +1779,6 @@ async function lookupISBN() {
     if (info?.title) {
       document.getElementById('book-title').value = info.title || '';
       document.getElementById('book-author').value = info.authors?.[0] || '';
-      if (info.categories?.[0]) {
-        const genreMap = {'Fiction':['fiction','novel'],'Non-fiction':['nonfiction','non-fiction','self-help','business'],'Sci-fi':['science fiction','sci-fi'],'Biography':['biography','autobiography','memoir'],'History':['history'],'Philosophy':['philosophy'],'Poetry':['poetry'],'Crime':['crime','thriller','mystery']};
-        const cat = info.categories[0].toLowerCase();
-        for (const [genre, keys] of Object.entries(genreMap)) {
-          if (keys.some(k => cat.includes(k))) { document.getElementById('book-genre').value = genre; break; }
-        }
-      }
       found = true;
     }
   } catch {}
@@ -1758,14 +1806,14 @@ async function scanISBN() {
   const overlay = document.createElement('div');
   overlay.id = 'scan-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:#1a1410;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:1rem';
-  overlay.innerHTML = '<p style="color:#f5f0e8;font-family:monospace">Point camera at barcode</p><div id="qr-reader" style="width:100%;max-width:400px;border:2px solid #c8853a"></div><p id="scan-status" style="color:#7a6f62;font-family:monospace">Scanning…</p><button onclick="stopScan()" style="padding:0.75rem 2rem;background:#c8853a;border:none;color:#1a1410;cursor:pointer">Cancel</button>';
+  overlay.innerHTML = '<p style="color:#f5f0e8;font-family:monospace">Point camera at barcode</p><div id="qr-reader" style="width:100%;max-width:400px;border:2px solid #c8853a"></div><button onclick="stopScan()" style="padding:0.75rem 2rem;background:#c8853a;border:none;color:#1a1410;cursor:pointer">Cancel</button>';
   document.body.appendChild(overlay);
   const html5QrCode = new Html5Qrcode('qr-reader');
   window._scanner = html5QrCode;
   try {
     await html5QrCode.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 280, height: 120 }, formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E] },
       (decodedText) => { stopScan(); document.getElementById('isbn-input').value = decodedText; lookupISBN(); }, () => {});
-  } catch(e) { stopScan(); showToast('Camera error: ' + e, true); }
+  } catch(e) { stopScan(); showToast('Camera error', true); }
 }
 
 async function stopScan() {
@@ -1787,17 +1835,10 @@ async function submitBook() {
   let bookLat = null, bookLng = null;
   if (bookPostcode) { try { const coords = await lookupPostcode(bookPostcode); if (coords) { bookLat = coords.lat; bookLng = coords.lng; } } catch {} }
   const payload = { title, author, genre: document.getElementById('book-genre').value || null, condition: window._selectedCondition || 'Good', location, will_post: window._selectedWillPost || false, note: document.getElementById('book-note').value.trim() || null, owner_name: displayName, user_id: currentUser?.id || null, isbn: isbnVal, postcode: bookPostcode || null, lat: bookLat, lng: bookLng, owner_email: currentUser?.email || null, cover_url: null };
-  // Fetch cover URL before saving
-  try {
-    const coverQ = isbnVal ? 'isbn:' + isbnVal : encodeURIComponent(title + ' ' + author);
-    const coverRes = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + coverQ + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
-    if (coverRes.ok) {
-      const coverData = await coverRes.json();
-      const thumb = coverData.items?.[0]?.volumeInfo?.imageLinks?.thumbnail || coverData.items?.[0]?.volumeInfo?.imageLinks?.smallThumbnail;
-      if (thumb) payload.cover_url = thumb.replace('http://', 'https://');
-    }
-  } catch {}
-
+  // Fetch cover URL via Open Library (no rate limit)
+  if (isbnVal) {
+    payload.cover_url = 'https://covers.openlibrary.org/b/isbn/' + isbnVal + '-M.jpg';
+  }
   try {
     const res = await fetch(SUPABASE_URL + '/rest/v1/books', {
       method: 'POST',
@@ -1831,7 +1872,6 @@ async function submitBook() {
 async function renderShelf(force=false) {
   const grid = document.getElementById('my-shelf-grid');
   const empty = document.getElementById('shelf-empty');
-  // Don't re-render if covers are loading (has children and not forced)
   if (!force && grid.children.length > 0 && grid.querySelector('.book-card')) return;
   if (!currentUser) {
     grid.innerHTML = '';
@@ -1901,7 +1941,7 @@ async function handleRequest(id, status, fromEmail, fromName) {
     showToast('Swap accepted ✓');
     const s = document.getElementById('stat-swaps'); s.textContent = (parseInt(s.textContent)||0)+1;
     const card = document.getElementById('req-'+id);
-    if (card) { card.innerHTML = '<div><p style="color:var(--sage);font-family:monospace;font-size:0.6rem;text-transform:uppercase">✓ Swap accepted</p><p style="font-style:italic">' + fromName + ' contact: <a href="mailto:' + fromEmail + '" style="color:var(--amber)">' + fromEmail + '</a></p></div>'; card.style.borderColor = 'var(--sage)'; }
+    if (card) { card.innerHTML = '<div><p style="color:var(--sage);font-family:monospace;font-size:0.6rem">✓ Accepted — <a href="mailto:' + fromEmail + '" style="color:var(--amber)">' + fromEmail + '</a></p></div>'; card.style.borderColor = 'var(--sage)'; }
   } else {
     showToast('Request declined');
     document.getElementById('req-'+id)?.remove();
@@ -1923,47 +1963,6 @@ function showToast(msg, isError=false) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
 }
-
-
-
-function openModal(id) {
-  currentBook = allBooks.find(b => b.id === id);
-  if (!currentBook) return;
-  document.getElementById('modal-genre').textContent = currentBook.genre || '';
-  document.getElementById('modal-title').textContent = currentBook.title;
-  document.getElementById('modal-author').textContent = currentBook.author;
-  document.getElementById('modal-condition').textContent = currentBook.condition;
-  document.getElementById('modal-location').textContent = currentBook.location;
-  document.getElementById('modal-post').textContent = currentBook.will_post ? 'Yes, happy to post' : 'Local only';
-  document.getElementById('modal-owner').textContent = currentBook.owner_name || 'Anonymous';
-  const n = document.getElementById('modal-note');
-  if (currentBook.note) { n.textContent = '"' + currentBook.note + '"'; n.style.display = 'block'; } else { n.style.display = 'none'; }
-  const reqForm = document.getElementById('request-form-section');
-  const contactRevealed = document.getElementById('contact-revealed');
-  if (reqForm) reqForm.style.display = 'flex';
-  if (contactRevealed) contactRevealed.style.display = 'none';
-  document.getElementById('req-name') && (document.getElementById('req-name').value = '');
-  document.getElementById('req-email') && (document.getElementById('req-email').value = '');
-  document.getElementById('req-offer') && (document.getElementById('req-offer').value = '');
-  const btn = document.getElementById('request-btn');
-  if (btn) { btn.disabled = false; btn.textContent = 'Start swap chat →'; }
-  document.getElementById('modal').classList.add('open');
-}
-
-function shareBook() {
-  if (!currentBook) return;
-  const text = 'Check out "' + currentBook.title + '" by ' + currentBook.author + ' on Shelfswap — free UK book exchange';
-  const url = 'https://www.shelfswap.online';
-  if (navigator.share) {
-    navigator.share({ title: currentBook.title, text, url }).catch(() => {});
-  } else {
-    navigator.clipboard.writeText(text + '\n' + url).then(() => showToast('Link copied ✓')).catch(() => showToast('Could not copy', true));
-  }
-}
-
-function closeModal() { document.getElementById('modal').classList.remove('open'); currentBook = null; }
-function closeModalOutside(e) { if (e.target === document.getElementById('modal')) closeModal(); }
-
 
 init();
 </script>
