@@ -1670,6 +1670,12 @@ async function loadCovers(books) {
     // Use cached cover if available
     if (coverCache[b.id]) { applyCoverToEl(el, coverCache[b.id]); continue; }
     if (el.querySelector('img')) continue;
+    // Use stored cover_url from database first (fastest, no API call)
+    if (b.cover_url) {
+      coverCache[b.id] = b.cover_url;
+      applyCoverToEl(el, b.cover_url);
+      continue;
+    }
     if (b.isbn) {
       const src = 'https://covers.openlibrary.org/b/isbn/' + b.isbn + '-M.jpg?default=false';
       const img = new Image();
@@ -1789,7 +1795,18 @@ async function submitBook() {
   const isbnVal = document.getElementById('isbn-input')?.value.trim().replace(/[^0-9X]/gi,'') || null;
   let bookLat = null, bookLng = null;
   if (bookPostcode) { try { const coords = await lookupPostcode(bookPostcode); if (coords) { bookLat = coords.lat; bookLng = coords.lng; } } catch {} }
-  const payload = { title, author, genre: document.getElementById('book-genre').value || null, condition: window._selectedCondition || 'Good', location, will_post: window._selectedWillPost || false, note: document.getElementById('book-note').value.trim() || null, owner_name: displayName, user_id: currentUser?.id || null, isbn: isbnVal, postcode: bookPostcode || null, lat: bookLat, lng: bookLng, owner_email: currentUser?.email || null };
+  const payload = { title, author, genre: document.getElementById('book-genre').value || null, condition: window._selectedCondition || 'Good', location, will_post: window._selectedWillPost || false, note: document.getElementById('book-note').value.trim() || null, owner_name: displayName, user_id: currentUser?.id || null, isbn: isbnVal, postcode: bookPostcode || null, lat: bookLat, lng: bookLng, owner_email: currentUser?.email || null, cover_url: null };
+  // Fetch cover URL before saving
+  try {
+    const coverQ = isbnVal ? 'isbn:' + isbnVal : encodeURIComponent(title + ' ' + author);
+    const coverRes = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + coverQ + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
+    if (coverRes.ok) {
+      const coverData = await coverRes.json();
+      const thumb = coverData.items?.[0]?.volumeInfo?.imageLinks?.thumbnail || coverData.items?.[0]?.volumeInfo?.imageLinks?.smallThumbnail;
+      if (thumb) payload.cover_url = thumb.replace('http://', 'https://');
+    }
+  } catch {}
+
   try {
     const res = await fetch(SUPABASE_URL + '/rest/v1/books', {
       method: 'POST',
