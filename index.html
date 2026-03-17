@@ -246,6 +246,20 @@
   .admin-delete-btn { padding:0.3rem 0.6rem; font-family:'DM Mono',monospace; font-size:0.55rem; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; border:1px solid var(--rust); color:var(--rust); background:transparent; transition:all 0.2s; }
   .admin-delete-btn:hover { background:var(--rust); color:var(--paper); }
 
+
+  /* LOCATION SEARCH */
+  .location-bar { display:flex; gap:0.75rem; align-items:center; padding:1rem 2rem; background:var(--card-bg); border-bottom:1px solid var(--card-border); flex-wrap:wrap; }
+  .postcode-input { padding:0.65rem 1rem; background:var(--ink); border:1px solid var(--card-border); color:var(--paper); font-family:'DM Mono',monospace; font-size:0.75rem; letter-spacing:0.05em; text-transform:uppercase; outline:none; width:140px; transition:border-color 0.2s; }
+  .postcode-input::placeholder { color:var(--muted); text-transform:none; }
+  .postcode-input:focus { border-color:var(--amber); }
+  .postcode-btn { padding:0.65rem 1rem; background:var(--amber); border:none; color:var(--ink); font-family:'DM Mono',monospace; font-size:0.7rem; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+  .postcode-btn:hover { background:var(--highlight); }
+  .radius-select { padding:0.65rem 1rem; background:var(--ink); border:1px solid var(--card-border); color:var(--muted); font-family:'DM Mono',monospace; font-size:0.7rem; letter-spacing:0.05em; outline:none; cursor:pointer; }
+  .location-status { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--amber); letter-spacing:0.05em; }
+  .clear-location { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted); letter-spacing:0.05em; cursor:pointer; text-decoration:underline; }
+  .clear-location:hover { color:var(--amber); }
+  .distance-badge { font-family:'DM Mono',monospace; font-size:0.6rem; color:var(--sage); letter-spacing:0.05em; margin-left:0.3rem; }
+
   @media(max-width:600px) {
     .hero-bar { padding:1.5rem 1rem; }
     .books-section { padding:1rem; }
@@ -318,6 +332,21 @@
     <div class="stat"><span class="stat-num">UK</span><span class="stat-label">Only</span></div>
     <div class="stat"><span class="stat-num">Free</span><span class="stat-label">Always</span></div>
   </div>
+  <!-- LOCATION BAR -->
+  <div class="location-bar">
+    <input class="postcode-input" id="postcode-input" type="text" placeholder="Enter postcode…" maxlength="8">
+    <button class="postcode-btn" onclick="searchByLocation()">Find nearby →</button>
+    <select class="radius-select" id="radius-select">
+      <option value="5">Within 5 miles</option>
+      <option value="10" selected>Within 10 miles</option>
+      <option value="25">Within 25 miles</option>
+      <option value="50">Within 50 miles</option>
+      <option value="0">Any distance</option>
+    </select>
+    <span class="location-status" id="location-status"></span>
+    <span class="clear-location" id="clear-location" style="display:none" onclick="clearLocation()">✕ Clear</span>
+  </div>
+
   <div class="books-section">
     <div class="section-header">
       <span class="section-title">Available now</span>
@@ -617,6 +646,67 @@ let currentBook = null;
 let selectedCondition = 'Like new';
 let selectedWillPost = false;
 
+
+
+
+// ── LOCATION ──────────────────────────────────────────────────────────────────
+let userLat = null;
+let userLng = null;
+let userRadius = 10;
+
+function haversineDistance(lat1, lng1, lat2, lng2) {
+  const R = 3958.8; // miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+async function lookupPostcode(postcode) {
+  const clean = postcode.trim().toUpperCase().replace(/\s+/g, '');
+  const res = await fetch('https://api.postcodes.io/postcodes/' + clean);
+  const data = await res.json();
+  if (data.status === 200) return { lat: data.result.latitude, lng: data.result.longitude };
+  return null;
+}
+
+async function searchByLocation() {
+  const postcode = document.getElementById('postcode-input').value.trim();
+  if (!postcode) { showToast('Enter a postcode first', true); return; }
+  const statusEl = document.getElementById('location-status');
+  statusEl.textContent = 'Looking up…';
+  try {
+    const coords = await lookupPostcode(postcode);
+    if (!coords) { showToast('Postcode not found', true); statusEl.textContent = ''; return; }
+    userLat = coords.lat;
+    userLng = coords.lng;
+    userRadius = parseInt(document.getElementById('radius-select').value);
+    statusEl.textContent = '📍 ' + postcode.toUpperCase();
+    document.getElementById('clear-location').style.display = 'inline';
+    filterBooks();
+    showToast('Showing books near ' + postcode.toUpperCase());
+  } catch(e) {
+    showToast('Could not look up postcode', true);
+    statusEl.textContent = '';
+  }
+}
+
+function clearLocation() {
+  userLat = null; userLng = null;
+  document.getElementById('location-status').textContent = '';
+  document.getElementById('clear-location').style.display = 'none';
+  document.getElementById('postcode-input').value = '';
+  filterBooks();
+}
+
+async function getBookCoords(postcode) {
+  try {
+    const coords = await lookupPostcode(postcode);
+    return coords;
+  } catch { return null; }
+}
 
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
@@ -945,7 +1035,7 @@ function bookCard(b, showDelete=false) {
     <div class="book-info">
       <div class="book-title">${b.title}</div>
       <div class="book-author">${b.author}</div>
-      <div class="book-meta"><span class="condition-badge ${cc}">${b.condition}</span><span class="book-location">📍 ${b.location}</span></div>
+      <div class="book-meta"><span class="condition-badge ${cc}">${b.condition}</span><span class="book-location">📍 ${b.location}${b._distance ? '<span class=\"distance-badge\">' + b._distance.toFixed(1) + 'mi</span>' : ''}</span></div>
     </div>
   </div>`;
 }
@@ -975,12 +1065,28 @@ function filterBooks() {
   const q = document.getElementById('search-input').value.toLowerCase();
   const genre = document.getElementById('genre-filter').value;
   const post = document.getElementById('post-filter').value;
-  renderBooks(allBooks.filter(b => {
+  userRadius = parseInt(document.getElementById('radius-select').value) || 10;
+
+  let filtered = allBooks.filter(b => {
     const mq = !q || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q) || (b.genre||'').toLowerCase().includes(q);
     const mg = !genre || b.genre === genre;
     const mp = !post || (post === 'post' ? b.will_post : !b.will_post);
     return mq && mg && mp;
-  }));
+  });
+
+  // Apply distance filter if user has set location
+  if (userLat && userLng && userRadius > 0) {
+    filtered = filtered.filter(b => {
+      if (!b.lat || !b.lng) return true; // show books without coords
+      const dist = haversineDistance(userLat, userLng, b.lat, b.lng);
+      b._distance = dist;
+      return dist <= userRadius;
+    });
+    // Sort by distance
+    filtered.sort((a, b) => (a._distance || 999) - (b._distance || 999));
+  }
+
+  renderBooks(filtered);
 }
 
 function openModal(id) {
@@ -1146,12 +1252,21 @@ async function submitBook() {
   const author = document.getElementById('book-author').value.trim();
   const location = document.getElementById('book-location').value.trim();
   const ownerName = document.getElementById('owner-name').value.trim();
+  const bookPostcode = document.getElementById('book-postcode').value.trim();
   if (!title || !author || !location) { showToast('Please fill in all required fields', true); return; }
   const displayName = currentUser ? (currentUser.user_metadata?.display_name || currentUser.email.split('@')[0]) : (ownerName || 'Anonymous');
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = 'Listing…';
   const isbnVal = document.getElementById('isbn-input').value.trim().replace(/[^0-9X]/gi,'') || null;
-  const payload = { title, author, genre: document.getElementById('book-genre').value || null, condition: selectedCondition, location, will_post: selectedWillPost, note: document.getElementById('book-note').value.trim() || null, owner_name: displayName, user_id: currentUser?.id || null, isbn: isbnVal };
+  // Look up postcode coords
+  let bookLat = null, bookLng = null;
+  if (bookPostcode) {
+    try {
+      const coords = await lookupPostcode(bookPostcode);
+      if (coords) { bookLat = coords.lat; bookLng = coords.lng; }
+    } catch {}
+  }
+  const payload = { title, author, genre: document.getElementById('book-genre').value || null, condition: selectedCondition, location, will_post: selectedWillPost, note: document.getElementById('book-note').value.trim() || null, owner_name: displayName, user_id: currentUser?.id || null, isbn: isbnVal, postcode: bookPostcode || null, lat: bookLat, lng: bookLng };
   try {
     const res = await fetch(SUPABASE_URL + '/rest/v1/books', {
       method: 'POST',
@@ -1173,7 +1288,7 @@ async function submitBook() {
   allBooks.unshift(saved);
   mySessionBooks.unshift(saved);
   document.getElementById('stat-books').textContent = allBooks.length;
-  ['isbn-input','book-title','book-author','book-location','book-note','owner-name'].forEach(id => document.getElementById(id).value = '');
+  ['isbn-input','book-title','book-author','book-location','book-note','owner-name','book-postcode'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   document.getElementById('book-genre').value = '';
   selectedCondition = 'Like new'; selectedWillPost = false;
   document.querySelectorAll('#view-list .toggle-group').forEach(g => g.querySelectorAll('.toggle-option').forEach((b,i) => b.classList.toggle('active', i===0)));
