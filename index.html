@@ -261,6 +261,22 @@
   .clear-location:hover { color:var(--amber); }
   .distance-badge { font-family:'DM Mono',monospace; font-size:0.6rem; color:var(--sage); letter-spacing:0.05em; margin-left:0.3rem; }
 
+
+  /* WISHLIST */
+  .wishlist-view { max-width:700px; margin:0 auto; padding:2.5rem 2rem; }
+  .wishlist-view h2 { font-family:'Playfair Display',serif; font-size:2rem; font-style:italic; margin-bottom:0.4rem; }
+  .wishlist-add-form { background:var(--card-bg); border:1px solid var(--card-border); padding:1.5rem; margin-bottom:2rem; }
+  .wishlist-add-form h3 { font-family:'DM Mono',monospace; font-size:0.7rem; color:var(--muted); letter-spacing:0.12em; text-transform:uppercase; margin-bottom:1.2rem; }
+  .wishlist-item { background:var(--card-bg); border:1px solid var(--card-border); padding:1rem 1.2rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+  .wishlist-item-info h4 { font-family:'Playfair Display',serif; font-size:1rem; font-style:italic; margin-bottom:0.2rem; }
+  .wishlist-item-info p { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted); letter-spacing:0.04em; }
+  .wishlist-remove-btn { padding:0.35rem 0.7rem; font-family:'DM Mono',monospace; font-size:0.6rem; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; border:1px solid var(--card-border); color:var(--muted); background:transparent; transition:all 0.2s; flex-shrink:0; }
+  .wishlist-remove-btn:hover { border-color:var(--rust); color:var(--rust); }
+  .wanted-section { margin-top:3rem; }
+  .wanted-section h3 { font-family:'DM Mono',monospace; font-size:0.7rem; color:var(--muted); letter-spacing:0.12em; text-transform:uppercase; border-bottom:1px solid var(--card-border); padding-bottom:0.75rem; margin-bottom:1rem; }
+  .wanted-tag { display:inline-block; font-family:'DM Mono',monospace; font-size:0.65rem; letter-spacing:0.06em; padding:0.35rem 0.75rem; border:1px solid var(--card-border); color:var(--muted); margin:0.3rem; cursor:default; transition:all 0.2s; }
+  .wanted-tag:hover { border-color:var(--amber); color:var(--amber); }
+
   @media(max-width:600px) {
     .hero-bar { padding:1.5rem 1rem; }
     .books-section { padding:1rem; }
@@ -280,6 +296,7 @@
     <button class="nav-btn" onclick="showView('browse')">Browse</button>
     <button class="nav-btn" onclick="showView('shelf')">My Shelf</button>
     <button class="nav-btn" onclick="showView('requests')">Requests <span id="req-count" style="color:var(--amber)"></span></button>
+    <button class="nav-btn" onclick="showView('wishlist')">Wishlist</button>
     <button class="nav-btn primary" onclick="handleListClick()">+ List a Book</button>
     <button class="nav-btn" id="profile-btn" onclick="showView('profile')">Profile</button>
     <button class="nav-btn" id="admin-btn" onclick="showView('admin')" style="display:none;color:var(--amber);border-color:var(--amber)">Admin</button><div id="auth-nav"></div>
@@ -496,6 +513,40 @@
   </div>
 </div>
 
+<!-- WISHLIST VIEW -->
+
+<div id="view-wishlist" class="view">
+  <div class="wishlist-view">
+    <h2>My wishlist</h2>
+    <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2rem">Books you're looking for</p>
+
+```
+<div class="wishlist-add-form" id="wishlist-add-section">
+  <h3>Add a book you want</h3>
+  <div class="form-row" style="margin-bottom:1rem">
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Title *</label>
+      <input class="form-input" id="wish-title" type="text" placeholder="Book title">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Author</label>
+      <input class="form-input" id="wish-author" type="text" placeholder="Author name">
+    </div>
+  </div>
+  <button class="submit-btn" style="margin-top:0" onclick="addToWishlist()">Add to wishlist →</button>
+</div>
+
+<div id="wishlist-items"></div>
+
+<div class="wanted-section">
+  <h3>What others are looking for</h3>
+  <div id="wanted-tags"></div>
+</div>
+```
+
+  </div>
+</div>
+
 <!-- ADMIN VIEW -->
 
 <div id="view-admin" class="view">
@@ -648,6 +699,113 @@ let selectedCondition = 'Like new';
 let selectedWillPost = false;
 
 
+
+
+
+// ── WISHLIST ──────────────────────────────────────────────────────────────────
+async function loadWishlist() {
+  // Show add form only if logged in
+  const addSection = document.getElementById('wishlist-add-section');
+  if (addSection) addSection.style.display = currentUser ? 'block' : 'none';
+
+  const itemsEl = document.getElementById('wishlist-items');
+  if (!itemsEl) return;
+
+  if (!currentUser) {
+    itemsEl.innerHTML = '<div style="text-align:center;padding:2rem;border:1px dashed var(--card-border)"><p style="font-family:monospace;font-size:0.75rem;color:var(--muted);margin-bottom:1rem">Sign in to add books to your wishlist</p><button class="submit-btn" style="max-width:200px;margin:0 auto" onclick="openAuth()">Sign in →</button></div>';
+    loadWantedTags();
+    return;
+  }
+
+  const { data, error } = await db.select('wishlists', { filter: { user_id: currentUser.id }, order: 'created_at.desc' });
+  const items = data || [];
+
+  if (!items.length) {
+    itemsEl.innerHTML = '<p style="font-family:monospace;font-size:0.75rem;color:var(--muted);padding:1rem 0">Your wishlist is empty. Add books you are looking for above.</p>';
+  } else {
+    itemsEl.innerHTML = items.map(w => `
+      <div class="wishlist-item" id="wish-${w.id}">
+        <div class="wishlist-item-info">
+          <h4>${w.title}</h4>
+          <p>${w.author || 'Author unknown'}</p>
+        </div>
+        <button class="wishlist-remove-btn" onclick="removeFromWishlist('${w.id}')">✕ Remove</button>
+      </div>`).join('');
+  }
+
+  loadWantedTags();
+}
+
+async function loadWantedTags() {
+  const el = document.getElementById('wanted-tags');
+  if (!el) return;
+  const { data } = await db.select('wishlists', { select: 'title,author', order: 'created_at.desc' });
+  if (!data?.length) { el.innerHTML = '<p style="font-family:monospace;font-size:0.7rem;color:var(--muted)">No one has added to their wishlist yet.</p>'; return; }
+  // Deduplicate by title
+  const seen = new Set();
+  const unique = data.filter(w => { const k = w.title.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+  el.innerHTML = unique.map(w => `<span class="wanted-tag">${w.title}${w.author ? ' — ' + w.author : ''}</span>`).join('');
+}
+
+async function addToWishlist() {
+  if (!currentUser) { openAuth(); return; }
+  const title = document.getElementById('wish-title').value.trim();
+  const author = document.getElementById('wish-author').value.trim();
+  if (!title) { showToast('Please enter a book title', true); return; }
+
+  const { error } = await db.insert('wishlists', {
+    user_id: currentUser.id,
+    owner_name: currentUser.user_metadata?.display_name || currentUser.email.split('@')[0],
+    owner_email: currentUser.email,
+    title,
+    author: author || null,
+  });
+
+  if (error) { showToast('Could not add — try again', true); return; }
+  document.getElementById('wish-title').value = '';
+  document.getElementById('wish-author').value = '';
+  showToast('"' + title + '" added to wishlist ✓');
+  loadWishlist();
+}
+
+async function removeFromWishlist(id) {
+  const token = localStorage.getItem('ss_token') || SUPABASE_KEY;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/wishlists?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token }
+  });
+  if (!res.ok) { showToast('Could not remove', true); return; }
+  document.getElementById('wish-' + id)?.remove();
+  showToast('Removed from wishlist');
+  loadWantedTags();
+}
+
+async function checkWishlistMatches(title, author) {
+  // Called when a new book is listed — check if it matches anyone's wishlist
+  try {
+    const { data } = await db.select('wishlists', { select: '*' });
+    if (!data?.length) return;
+    const titleLower = title.toLowerCase();
+    const matches = data.filter(w => {
+      const wTitle = w.title.toLowerCase();
+      return titleLower.includes(wTitle) || wTitle.includes(titleLower) ||
+        (author && w.author && author.toLowerCase().includes(w.author.toLowerCase()));
+    });
+    // Send email to each matched user
+    for (const match of matches) {
+      if (match.owner_email && match.user_id !== currentUser?.id) {
+        sendSwapNotification(
+          match.owner_email,
+          match.owner_name || 'there',
+          'Shelfswap',
+          title,
+          'A book on your wishlist just appeared!'
+        );
+      }
+    }
+    if (matches.length > 0) console.log('Wishlist matches found:', matches.length);
+  } catch {}
+}
 
 
 // ── LOCATION ──────────────────────────────────────────────────────────────────
@@ -976,6 +1134,7 @@ function showView(name) {
   if (name === 'landing') updateLandingStats();
   if (name === 'profile') renderProfile();
   if (name === 'admin') loadAdminDashboard();
+  if (name === 'wishlist') loadWishlist();
 }
 
 async function renderProfile() {
@@ -1342,6 +1501,7 @@ async function submitBook() {
   selectedCondition = 'Like new'; selectedWillPost = false;
   document.querySelectorAll('#view-list .toggle-group').forEach(g => g.querySelectorAll('.toggle-option').forEach((b,i) => b.classList.toggle('active', i===0)));
   showToast('"' + title + '" listed ✓');
+  checkWishlistMatches(title, author);
   setTimeout(() => showView('shelf'), 1000);
 }
 
