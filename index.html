@@ -1649,16 +1649,35 @@ function bookCard(b, showDelete=false) {
 }
 
 async function loadCovers(books) {
+  // Batch requests with a small delay to avoid rate limiting
   for (const b of books) {
     const el = document.getElementById('cover-' + b.id);
     if (!el) continue;
+    // Skip if cover already loaded
+    if (el.querySelector('img')) continue;
     try {
-      // Use Google Books API — fully CORS-friendly on real domains
-      const q = b.isbn ? 'isbn:' + b.isbn : encodeURIComponent(b.title + ' ' + b.author);
-      const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
-      if (!res.ok) continue;
-      const data = await res.json();
-      const thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
+      let thumb = null;
+      // Try ISBN first (most accurate)
+      if (b.isbn) {
+        const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + b.isbn + '&maxResults=1&fields=items(volumeInfo/imageLinks)');
+        if (res.ok) {
+          const data = await res.json();
+          thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
+        }
+      }
+      // Fall back to title search
+      if (!thumb) {
+        const q = encodeURIComponent(b.title + (b.author ? ' ' + b.author : ''));
+        const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=3&fields=items(volumeInfo/imageLinks,volumeInfo/title)');
+        if (res.ok) {
+          const data = await res.json();
+          // Find best match — prefer exact title match
+          const items = data.items || [];
+          const exact = items.find(i => i.volumeInfo?.title?.toLowerCase().includes(b.title.toLowerCase()));
+          const best = exact || items[0];
+          thumb = best?.volumeInfo?.imageLinks?.thumbnail || best?.volumeInfo?.imageLinks?.smallThumbnail;
+        }
+      }
       if (!thumb) continue;
       const src = thumb.replace('http://', 'https://').replace('zoom=1', 'zoom=2');
       const img = new Image();
@@ -1666,84 +1685,10 @@ async function loadCovers(books) {
       img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0';
       img.onload = () => { el.style.position = 'relative'; el.innerHTML = ''; el.appendChild(img); };
     } catch { /* keep placeholder */ }
+    // Small delay between requests to avoid hitting rate limits
+    await new Promise(r => setTimeout(r, 150));
   }
 }
-
-function filterBooks() {
-  const q = document.getElementById('search-input').value.toLowerCase();
-  const genre = document.getElementById('genre-filter').value;
-  const post = document.getElementById('post-filter').value;
-  userRadius = parseInt(document.getElementById('radius-select').value) || 10;
-
-  let filtered = allBooks.filter(b => {
-    const mq = !q || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q) || (b.genre||'').toLowerCase().includes(q);
-    const mg = !genre || b.genre === genre;
-    const mp = !post || (post === 'post' ? b.will_post : !b.will_post);
-    return mq && mg && mp;
-  });
-
-  // Apply distance filter if user has set location
-  if (userLat && userLng && userRadius > 0) {
-    filtered = filtered.filter(b => {
-      if (!b.lat || !b.lng) return true; // show books without coords
-      const dist = haversineDistance(userLat, userLng, b.lat, b.lng);
-      b._distance = dist;
-      return dist <= userRadius;
-    });
-    // Sort by distance
-    filtered.sort((a, b) => (a._distance || 999) - (b._distance || 999));
-  }
-
-  renderBooks(filtered);
-}
-
-function openModal(id) {
-  currentBook = allBooks.find(b => b.id === id);
-  if (!currentBook) return;
-  document.getElementById('modal-genre').textContent = currentBook.genre || '';
-  document.getElementById('modal-title').textContent = currentBook.title;
-  document.getElementById('modal-author').textContent = currentBook.author;
-  document.getElementById('modal-condition').textContent = currentBook.condition;
-  document.getElementById('modal-location').textContent = currentBook.location;
-  document.getElementById('modal-post').textContent = currentBook.will_post ? 'Yes, happy to post' : 'Local only';
-  document.getElementById('modal-owner').textContent = currentBook.owner_name || 'Anonymous';
-  const n = document.getElementById('modal-note');
-  if (currentBook.note) { n.textContent = '"' + currentBook.note + '"'; n.style.display = 'block'; } else { n.style.display = 'none'; }
-  document.getElementById('req-name').value = '';
-  document.getElementById('req-email').value = '';
-  document.getElementById('req-offer').value = '';
-  document.getElementById('contact-revealed').style.display = 'none';
-  document.getElementById('request-form-section').style.display = 'flex';
-  const btn = document.getElementById('request-btn');
-  btn.disabled = false; btn.textContent = 'Request this swap →';
-  document.getElementById('modal').classList.add('open');
-}
-
-function shareBook() {
-  if (!currentBook) return;
-  const text = `📚 "${currentBook.title}" by ${currentBook.author} — available to swap in ${currentBook.location} on Shelfswap`;
-  const url = 'https://shelfswap.online';
-  if (navigator.share) {
-    navigator.share({ title: currentBook.title, text, url }).catch(() => {});
-  } else {
-    navigator.clipboard.writeText(text + '\n' + url).then(() => showToast('Link copied ✓')).catch(() => showToast('Could not copy', true));
-  }
-}
-
-function closeModal() { document.getElementById('modal').classList.remove('open'); currentBook = null; }
-function closeModalOutside(e) { if (e.target === document.getElementById('modal')) closeModal(); }
-
-async function requestSwap() {
-  if (!currentUser) { openAuth(); showToast('Sign in to request a swap', false); return; }
-  if (!currentBook) return;
-  const btn = document.getElementById('request-btn');
-  btn.disabled = true; btn.textContent = 'Starting chat…';
-  await startConversation(currentBook);
-  btn.disabled = false; btn.textContent = 'Start swap chat →';
-}
-
-
-// ── CORE FUNCTIONS ────────────────────────────────────────────────────────────
 
 function selectCondition(el, val) {
   window._selectedCondition = val;
@@ -1770,7 +1715,7 @@ async function lookupISBN() {
       document.getElementById('book-title').value = info.title || '';
       document.getElementById('book-author').value = info.authors?.[0] || '';
       if (info.categories?.[0]) {
-        const genreMap = { 'Fiction':['fiction','novel'], 'Non-fiction':['nonfiction','non-fiction','self-help','business'], 'Sci-fi':['science fiction','sci-fi'], 'Biography':['biography','autobiography','memoir'], 'History':['history'], 'Philosophy':['philosophy'], 'Poetry':['poetry'], 'Crime':['crime','thriller','mystery'] };
+        const genreMap = {'Fiction':['fiction','novel'],'Non-fiction':['nonfiction','non-fiction','self-help','business'],'Sci-fi':['science fiction','sci-fi'],'Biography':['biography','autobiography','memoir'],'History':['history'],'Philosophy':['philosophy'],'Poetry':['poetry'],'Crime':['crime','thriller','mystery']};
         const cat = info.categories[0].toLowerCase();
         for (const [genre, keys] of Object.entries(genreMap)) {
           if (keys.some(k => cat.includes(k))) { document.getElementById('book-genre').value = genre; break; }
@@ -1784,11 +1729,7 @@ async function lookupISBN() {
       const res = await fetch('https://openlibrary.org/api/books?bibkeys=ISBN:' + isbn + '&format=json&jscmd=data');
       const data = await res.json();
       const book = data['ISBN:' + isbn];
-      if (book?.title) {
-        document.getElementById('book-title').value = book.title || '';
-        document.getElementById('book-author').value = book.authors?.[0]?.name || '';
-        found = true;
-      }
+      if (book?.title) { document.getElementById('book-title').value = book.title || ''; document.getElementById('book-author').value = book.authors?.[0]?.name || ''; found = true; }
     } catch {}
   }
   if (found) { showToast('Details filled in ✓'); } else { showToast('ISBN not found — fill in manually', true); }
@@ -1839,7 +1780,7 @@ async function submitBook() {
   try {
     const res = await fetch(SUPABASE_URL + '/rest/v1/books', {
       method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + (localStorage.getItem('ss_token') || SUPABASE_KEY), 'Content-Type': 'application/json' },
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + (localStorage.getItem('ss_token') || SUPABASE_KEY), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     if (!res.ok && res.status !== 201) {
@@ -1876,7 +1817,7 @@ async function renderShelf() {
   }
   grid.innerHTML = '<p style="color:#7a6f62;padding:1rem 0">Loading…</p>';
   empty.style.display = 'none';
-  const { data, error } = await db.select('books', { select: '*', filter: { user_id: currentUser.id }, order: 'created_at.desc' });
+  const { data } = await db.select('books', { select: '*', filter: { user_id: currentUser.id }, order: 'created_at.desc' });
   const books = (data && data.length > 0) ? data : mySessionBooks;
   grid.innerHTML = '';
   if (!books || books.length === 0) {
@@ -1907,7 +1848,7 @@ async function renderShelf() {
 
 async function markSwapped(id) {
   const { error } = await db.update('books', id, { is_swapped: true });
-  if (error) { showToast('Could not update — try again', true); return; }
+  if (error) { showToast('Could not update', true); return; }
   allBooks = allBooks.map(b => b.id === id ? {...b, is_swapped: true} : b);
   showToast('Marked as swapped ✓');
   renderShelf();
@@ -1916,7 +1857,7 @@ async function markSwapped(id) {
 async function deleteBook(id) {
   if (!confirm('Remove this book from Shelfswap?')) return;
   const { error } = await db.delete('books', id);
-  if (error) { showToast('Could not remove — try again', true); return; }
+  if (error) { showToast('Could not remove', true); return; }
   allBooks = allBooks.filter(b => b.id !== id);
   mySessionBooks = mySessionBooks.filter(b => b.id !== id);
   document.getElementById('book-' + id)?.remove();
@@ -1937,7 +1878,7 @@ async function handleRequest(id, status, fromEmail, fromName) {
     showToast('Swap accepted ✓');
     const s = document.getElementById('stat-swaps'); s.textContent = (parseInt(s.textContent)||0)+1;
     const card = document.getElementById('req-'+id);
-    if (card) { card.innerHTML = '<div style="width:100%"><p style="font-family:monospace;font-size:0.6rem;color:var(--sage);text-transform:uppercase;margin-bottom:0.5rem">✓ Swap accepted</p><p style="font-family:serif;font-size:1rem;font-style:italic;margin-bottom:0.3rem">' + fromName + '&apos;s contact</p><p><a href="mailto:' + fromEmail + '" style="color:var(--amber)">' + fromEmail + '</a></p></div>'; card.style.borderColor = 'var(--sage)'; }
+    if (card) { card.innerHTML = '<div><p style="color:var(--sage);font-family:monospace;font-size:0.6rem;text-transform:uppercase">✓ Swap accepted</p><p style="font-style:italic">' + fromName + ' contact: <a href="mailto:' + fromEmail + '" style="color:var(--amber)">' + fromEmail + '</a></p></div>'; card.style.borderColor = 'var(--sage)'; }
   } else {
     showToast('Request declined');
     document.getElementById('req-'+id)?.remove();
