@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -222,6 +223,29 @@
   .landing-footer { padding:2rem; border-top:1px solid var(--card-border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; }
   .landing-footer p { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted); letter-spacing:0.05em; }
 
+
+  /* ADMIN */
+  .admin-view { padding: 2rem; max-width: 1100px; margin: 0 auto; }
+  .admin-view h2 { font-family:'Playfair Display',serif; font-size:2rem; font-style:italic; margin-bottom:0.3rem; }
+  .admin-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1px; background:var(--card-border); margin:2rem 0; }
+  .admin-stat { background:var(--card-bg); padding:1.5rem; }
+  .admin-stat-num { font-family:'Playfair Display',serif; font-size:2.5rem; font-weight:700; color:var(--amber); display:block; margin-bottom:0.2rem; }
+  .admin-stat-label { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; }
+  .admin-section { margin-bottom:2.5rem; }
+  .admin-section h3 { font-family:'DM Mono',monospace; font-size:0.7rem; color:var(--muted); letter-spacing:0.12em; text-transform:uppercase; border-bottom:1px solid var(--card-border); padding-bottom:0.75rem; margin-bottom:1rem; }
+  .admin-table { width:100%; border-collapse:collapse; }
+  .admin-table th { font-family:'DM Mono',monospace; font-size:0.6rem; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; padding:0.6rem 1rem; text-align:left; border-bottom:1px solid var(--card-border); }
+  .admin-table td { font-family:'DM Mono',monospace; font-size:0.72rem; color:var(--paper); padding:0.7rem 1rem; border-bottom:1px solid rgba(58,50,40,0.5); }
+  .admin-table tr:hover td { background:rgba(255,255,255,0.02); }
+  .admin-bar-wrap { background:var(--card-bg); border:1px solid var(--card-border); padding:1.5rem; }
+  .admin-bar-row { display:flex; align-items:center; gap:1rem; margin-bottom:0.75rem; }
+  .admin-bar-label { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted); letter-spacing:0.05em; width:100px; flex-shrink:0; }
+  .admin-bar { flex:1; height:8px; background:var(--card-border); position:relative; }
+  .admin-bar-fill { height:100%; background:var(--amber); transition:width 0.6s ease; }
+  .admin-bar-val { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--amber); width:30px; text-align:right; flex-shrink:0; }
+  .admin-delete-btn { padding:0.3rem 0.6rem; font-family:'DM Mono',monospace; font-size:0.55rem; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; border:1px solid var(--rust); color:var(--rust); background:transparent; transition:all 0.2s; }
+  .admin-delete-btn:hover { background:var(--rust); color:var(--paper); }
+
   @media(max-width:600px) {
     .hero-bar { padding:1.5rem 1rem; }
     .books-section { padding:1rem; }
@@ -231,6 +255,7 @@
     .list-view,.shelf-view { padding:1.5rem 1rem; }
   }
 </style>
+
 </head>
 <body>
 
@@ -241,11 +266,13 @@
     <button class="nav-btn" onclick="showView('shelf')">My Shelf</button>
     <button class="nav-btn" onclick="showView('requests')">Requests <span id="req-count" style="color:var(--amber)"></span></button>
     <button class="nav-btn primary" onclick="handleListClick()">+ List a Book</button>
-    <button class="nav-btn" id="profile-btn" onclick="showView('profile')">Profile</button><div id="auth-nav"></div>
+    <button class="nav-btn" id="profile-btn" onclick="showView('profile')">Profile</button>
+    <button class="nav-btn" id="admin-btn" onclick="showView('admin')" style="display:none;color:var(--amber);border-color:var(--amber)">Admin</button><div id="auth-nav"></div>
   </div>
 </nav>
 
 <!-- AUTH MODAL -->
+
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-box">
     <h2>Welcome back</h2>
@@ -263,6 +290,7 @@
 </div>
 
 <!-- BROWSE -->
+
 <div id="view-browse" class="view">
   <div class="hero-bar">
     <div>
@@ -300,6 +328,7 @@
 </div>
 
 <!-- LIST -->
+
 <div id="view-list" class="view">
   <div class="list-view">
     <h2>List a book</h2>
@@ -365,6 +394,7 @@
 </div>
 
 <!-- MY SHELF -->
+
 <div id="view-shelf" class="view">
   <div class="shelf-view">
     <h2>My shelf</h2>
@@ -378,6 +408,7 @@
 </div>
 
 <!-- REQUESTS -->
+
 <div id="view-requests" class="view">
   <div style="padding:2rem;max-width:700px">
     <h2 style="font-family:'Playfair Display',serif;font-size:2rem;font-style:italic;margin-bottom:0.4rem">Swap requests</h2>
@@ -390,6 +421,7 @@
 </div>
 
 <!-- MODAL -->
+
 <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
   <div class="modal">
     <div class="modal-header">
@@ -424,9 +456,8 @@
   </div>
 </div>
 
-
-
 <!-- PROFILE VIEW -->
+
 <div id="view-profile" class="view">
   <div style="max-width:600px;margin:0 auto;padding:2.5rem 2rem">
     <h2 style="font-family:'Playfair Display',serif;font-size:2rem;font-style:italic;margin-bottom:0.4rem">My profile</h2>
@@ -435,7 +466,49 @@
   </div>
 </div>
 
+<!-- ADMIN VIEW -->
+
+<div id="view-admin" class="view">
+  <div class="admin-view">
+    <h2>Admin dashboard</h2>
+    <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2rem">Shelfswap — live stats</p>
+
+```
+<div class="admin-grid" id="admin-stats-grid">
+  <div class="admin-stat"><span class="admin-stat-num" id="as-books">—</span><span class="admin-stat-label">Books listed</span></div>
+  <div class="admin-stat"><span class="admin-stat-num" id="as-users">—</span><span class="admin-stat-label">Users</span></div>
+  <div class="admin-stat"><span class="admin-stat-num" id="as-swaps">—</span><span class="admin-stat-label">Swaps completed</span></div>
+  <div class="admin-stat"><span class="admin-stat-num" id="as-requests">—</span><span class="admin-stat-label">Pending requests</span></div>
+  <div class="admin-stat"><span class="admin-stat-num" id="as-today">—</span><span class="admin-stat-label">Listed today</span></div>
+  <div class="admin-stat"><span class="admin-stat-num" id="as-available">—</span><span class="admin-stat-label">Available now</span></div>
+</div>
+
+<div class="admin-section">
+  <h3>Books by genre</h3>
+  <div class="admin-bar-wrap" id="admin-genres"></div>
+</div>
+
+<div class="admin-section">
+  <h3>Top locations</h3>
+  <div class="admin-bar-wrap" id="admin-locations"></div>
+</div>
+
+<div class="admin-section">
+  <h3>All books</h3>
+  <div style="overflow-x:auto">
+    <table class="admin-table">
+      <thead><tr><th>Title</th><th>Author</th><th>Location</th><th>Owner</th><th>Condition</th><th>Status</th><th></th></tr></thead>
+      <tbody id="admin-books-table"></tbody>
+    </table>
+  </div>
+</div>
+```
+
+  </div>
+</div>
+
 <!-- LANDING PAGE -->
+
 <div id="view-landing" class="view">
   <div class="landing-hero">
     <p class="landing-eyebrow">📍 UK book exchange — free, always</p>
@@ -545,6 +618,95 @@ let selectedCondition = 'Like new';
 let selectedWillPost = false;
 
 
+
+// ── ADMIN ─────────────────────────────────────────────────────────────────────
+const ADMIN_EMAIL = 'colingoddard4444@outlook.com';
+
+function checkAdminAccess() {
+  const btn = document.getElementById('admin-btn');
+  if (!btn) return;
+  if (currentUser && currentUser.email === ADMIN_EMAIL) {
+    btn.style.display = 'block';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+async function loadAdminDashboard() {
+  if (!currentUser || currentUser.email !== ADMIN_EMAIL) {
+    showView('browse'); showToast('Access denied', true); return;
+  }
+
+  // Load all books
+  const { data: books } = await db.select('books', { select: '*', order: 'created_at.desc' });
+  const allB = books || [];
+
+  // Stats
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayBooks = allB.filter(b => new Date(b.created_at) >= today);
+  const swapped = allB.filter(b => b.is_swapped);
+  const available = allB.filter(b => !b.is_swapped);
+
+  document.getElementById('as-books').textContent = allB.length;
+  document.getElementById('as-swaps').textContent = swapped.length;
+  document.getElementById('as-today').textContent = todayBooks.length;
+  document.getElementById('as-available').textContent = available.length;
+
+  // Pending requests
+  const { count: reqCount } = await db.count('requests', { status: 'pending' });
+  document.getElementById('as-requests').textContent = reqCount || 0;
+
+  // Users — count unique owner_names as proxy (no direct auth.users access with anon key)
+  const uniqueOwners = new Set(allB.map(b => b.user_id).filter(Boolean));
+  document.getElementById('as-users').textContent = uniqueOwners.size;
+
+  // Genre breakdown
+  const genreCounts = {};
+  allB.forEach(b => { const g = b.genre || 'Unknown'; genreCounts[g] = (genreCounts[g]||0) + 1; });
+  const maxG = Math.max(...Object.values(genreCounts));
+  const genreEl = document.getElementById('admin-genres');
+  genreEl.innerHTML = Object.entries(genreCounts).sort((a,b) => b[1]-a[1]).map(([g,n]) => `
+    <div class="admin-bar-row">
+      <span class="admin-bar-label">${g}</span>
+      <div class="admin-bar"><div class="admin-bar-fill" style="width:${(n/maxG*100)}%"></div></div>
+      <span class="admin-bar-val">${n}</span>
+    </div>`).join('');
+
+  // Location breakdown
+  const locCounts = {};
+  allB.forEach(b => { const l = b.location || 'Unknown'; locCounts[l] = (locCounts[l]||0) + 1; });
+  const maxL = Math.max(...Object.values(locCounts));
+  const locEl = document.getElementById('admin-locations');
+  locEl.innerHTML = Object.entries(locCounts).sort((a,b) => b[1]-a[1]).slice(0,10).map(([l,n]) => `
+    <div class="admin-bar-row">
+      <span class="admin-bar-label">${l}</span>
+      <div class="admin-bar"><div class="admin-bar-fill" style="width:${(n/maxL*100)}%"></div></div>
+      <span class="admin-bar-val">${n}</span>
+    </div>`).join('');
+
+  // Books table
+  const tbody = document.getElementById('admin-books-table');
+  tbody.innerHTML = allB.map(b => `
+    <tr>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:italic">${b.title}</td>
+      <td style="color:var(--muted)">${b.author}</td>
+      <td>${b.location}</td>
+      <td style="color:var(--muted)">${b.owner_name || '—'}</td>
+      <td>${b.condition}</td>
+      <td style="color:${b.is_swapped ? 'var(--sage)' : 'var(--amber)'}">${b.is_swapped ? 'Swapped' : 'Available'}</td>
+      <td><button class="admin-delete-btn" onclick="adminDeleteBook('${b.id}')">Delete</button></td>
+    </tr>`).join('');
+}
+
+async function adminDeleteBook(id) {
+  if (!confirm('Delete this book permanently?')) return;
+  const { error } = await db.delete('books', id);
+  if (error) { showToast('Could not delete', true); return; }
+  showToast('Book deleted ✓');
+  loadAdminDashboard();
+}
+
+
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 let currentUser = null;
 let authMode = 'signin';
@@ -563,6 +725,7 @@ async function checkSession() {
   } catch {}
   currentUser = null;
   updateAuthNav();
+  checkAdminAccess();
 }
 
 function updateAuthNav() {
@@ -691,6 +854,7 @@ function showView(name) {
   if (name === 'requests') loadRequests();
   if (name === 'landing') updateLandingStats();
   if (name === 'profile') renderProfile();
+  if (name === 'admin') loadAdminDashboard();
 }
 
 async function renderProfile() {
@@ -1149,5 +1313,6 @@ function showToast(msg, isError=false) {
 
 init();
 </script>
+
 </body>
 </html>
