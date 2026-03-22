@@ -343,6 +343,30 @@
     .chat-area.mobile-show { display:flex; }
   }
 
+
+  /* RATINGS */
+  .star-rating { display:flex; gap:0.3rem; margin:0.5rem 0; }
+  .star { font-size:1.4rem; cursor:pointer; color:var(--card-border); transition:color 0.15s; line-height:1; }
+  .star.active { color:var(--amber); }
+  .star:hover { color:var(--highlight); }
+  .rating-badge { font-family:'DM Mono',monospace; font-size:0.6rem; color:var(--amber); letter-spacing:0.04em; }
+  .rating-modal { background:var(--card-bg); border:1px solid var(--card-border); max-width:400px; width:100%; padding:2rem; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:300; display:none; }
+  .rating-modal.open { display:block; }
+  .rating-modal h3 { font-family:'Playfair Display',serif; font-size:1.3rem; font-style:italic; margin-bottom:0.5rem; }
+  .rating-modal p { font-family:'DM Mono',monospace; font-size:0.68rem; color:var(--muted); letter-spacing:0.05em; margin-bottom:1.2rem; }
+  .rating-backdrop { display:none; position:fixed; inset:0; background:rgba(10,8,6,0.85); z-index:299; }
+  .rating-backdrop.open { display:block; }
+  .rating-submit { width:100%; padding:0.85rem; background:var(--amber); border:none; color:var(--ink); font-family:'DM Mono',monospace; font-size:0.75rem; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; margin-top:1rem; transition:all 0.2s; }
+  .rating-submit:hover { background:var(--highlight); }
+  .rating-skip { width:100%; padding:0.5rem; background:transparent; border:none; color:var(--muted); font-family:'DM Mono',monospace; font-size:0.65rem; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; margin-top:0.5rem; }
+
+
+  /* SYNOPSIS */
+  .synopsis-section { margin-top:1rem; }
+  .synopsis-label { font-family:'DM Mono',monospace; font-size:0.6rem; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:0.5rem; }
+  .synopsis-text { font-family:'Libre Baskerville',serif; font-size:0.85rem; color:var(--cream); line-height:1.7; max-height:150px; overflow-y:auto; }
+  .synopsis-loading { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted); letter-spacing:0.05em; }
+
   @media(max-width:600px) {
     .hero-bar { padding:1.5rem 1rem; }
     .books-section { padding:1rem; }
@@ -547,6 +571,10 @@
         <div class="meta-item"><span class="meta-label">Listed by</span><span class="meta-value" id="modal-owner"></span></div>
       </div>
       <div class="modal-note" id="modal-note" style="display:none"></div>
+      <div class="synopsis-section" id="synopsis-section" style="display:none">
+        <p class="synopsis-label">About this book</p>
+        <p class="synopsis-text" id="synopsis-text"></p>
+      </div>
       <div class="request-form" id="request-form-section">
         <label>Send a swap request</label>
         <input type="text" id="req-name" placeholder="Your name *">
@@ -741,6 +769,23 @@
   </div>
 </div>
 
+
+<!-- RATING MODAL -->
+<div class="rating-backdrop" id="rating-backdrop" onclick="closeRating()"></div>
+<div class="rating-modal" id="rating-modal">
+  <h3>Rate this swap</h3>
+  <p id="rating-prompt">How was your swap?</p>
+  <div class="star-rating" id="star-rating">
+    <span class="star" onclick="selectStar(1)">★</span>
+    <span class="star" onclick="selectStar(2)">★</span>
+    <span class="star" onclick="selectStar(3)">★</span>
+    <span class="star" onclick="selectStar(4)">★</span>
+    <span class="star" onclick="selectStar(5)">★</span>
+  </div>
+  <button class="rating-submit" onclick="submitRating()">Submit rating →</button>
+  <button class="rating-skip" onclick="closeRating()">Skip for now</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -811,6 +856,98 @@ let selectedWillPost = false;
 
 
 
+
+
+
+
+async function fetchSynopsis(book) {
+  const section = document.getElementById('synopsis-section');
+  const text = document.getElementById('synopsis-text');
+  if (!section || !text) return;
+  section.style.display = 'block';
+  text.innerHTML = '<span class="synopsis-loading">Loading…</span>';
+  try {
+    const q = book.isbn ? 'isbn:' + book.isbn : encodeURIComponent(book.title + ' ' + book.author);
+    const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1&fields=items(volumeInfo/description)');
+    if (!res.ok) { section.style.display = 'none'; return; }
+    const data = await res.json();
+    const desc = data.items?.[0]?.volumeInfo?.description;
+    if (!desc) { section.style.display = 'none'; return; }
+    // Strip HTML tags from description
+    text.textContent = desc.replace(/<[^>]*>/g, '');
+  } catch { section.style.display = 'none'; }
+}
+
+
+// ── RATINGS ───────────────────────────────────────────────────────────────────
+let pendingRating = { bookId: null, ratedUserId: null, stars: 0 };
+
+function selectStar(n) {
+  pendingRating.stars = n;
+  document.querySelectorAll('.star').forEach((s, i) => {
+    s.classList.toggle('active', i < n);
+  });
+}
+
+function openRating(bookId, ratedUserId, ownerName) {
+  if (!currentUser || !ratedUserId || ratedUserId === currentUser.id) return;
+  pendingRating = { bookId, ratedUserId, stars: 0 };
+  document.getElementById('rating-prompt').textContent = 'How was your swap with ' + ownerName + '?';
+  document.querySelectorAll('.star').forEach(s => s.classList.remove('active'));
+  document.getElementById('rating-modal').classList.add('open');
+  document.getElementById('rating-backdrop').classList.add('open');
+}
+
+function closeRating() {
+  document.getElementById('rating-modal').classList.remove('open');
+  document.getElementById('rating-backdrop').classList.remove('open');
+  pendingRating = { bookId: null, ratedUserId: null, stars: 0 };
+}
+
+async function submitRating() {
+  if (!pendingRating.stars) { showToast('Please select a star rating', true); return; }
+  if (!currentUser || !pendingRating.ratedUserId) return;
+  const token = localStorage.getItem('ss_token') || SUPABASE_KEY;
+  const res = await fetch(SUPABASE_URL + '/rest/v1/ratings', {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rater_id: currentUser.id, rated_user_id: pendingRating.ratedUserId, book_id: pendingRating.bookId, stars: pendingRating.stars })
+  });
+  if (!res.ok) { showToast('Could not submit rating', true); return; }
+  closeRating();
+  showToast('Rating submitted ✓');
+}
+
+async function getUserRating(userId) {
+  if (!userId) return null;
+  const { data } = await db.select('ratings', { select: 'stars', filter: { rated_user_id: userId } });
+  if (!data?.length) return null;
+  const avg = data.reduce((sum, r) => sum + r.stars, 0) / data.length;
+  return { avg: avg.toFixed(1), count: data.length };
+}
+
+async function loadRatingsForBooks(books) {
+  // Load ratings for all unique owners
+  const ownerIds = [...new Set(books.map(b => b.user_id).filter(Boolean))];
+  for (const uid of ownerIds) {
+    const rating = await getUserRating(uid);
+    if (rating) {
+      // Update all cards for this owner
+      books.filter(b => b.user_id === uid).forEach(b => {
+        const card = document.getElementById('book-' + b.id);
+        if (card) {
+          const meta = card.querySelector('.book-meta');
+          if (meta && !meta.querySelector('.rating-badge')) {
+            const badge = document.createElement('span');
+            badge.className = 'rating-badge';
+            badge.textContent = '★ ' + rating.avg + ' (' + rating.count + ')';
+            meta.appendChild(badge);
+          }
+        }
+      });
+    }
+  }
+}
 
 
 // ── MESSAGING ─────────────────────────────────────────────────────────────────
@@ -1608,6 +1745,7 @@ function renderBooks(books) {
   grid.innerHTML = books.map(b => bookCard(b)).join('');
   // Load covers async after render — doesn't block UI
   loadCovers(books);
+  loadRatingsForBooks(books);
 }
 
 function coverUrl(b) {
@@ -1736,7 +1874,14 @@ function openModal(id) {
   if (currentBook.note) { n.textContent = '"' + currentBook.note + '"'; n.style.display = 'block'; } else { n.style.display = 'none'; }
   const btn = document.getElementById('request-btn');
   if (btn) { btn.disabled = false; btn.textContent = 'Start swap chat →'; }
+  // Reset synopsis
+  const synSection = document.getElementById('synopsis-section');
+  const synText = document.getElementById('synopsis-text');
+  if (synSection) synSection.style.display = 'none';
+  if (synText) synText.textContent = '';
   document.getElementById('modal').classList.add('open');
+  // Fetch synopsis after modal opens
+  fetchSynopsis(currentBook);
 }
 
 function shareBook() {
@@ -1919,6 +2064,15 @@ async function markSwapped(id) {
   allBooks = allBooks.map(b => b.id === id ? {...b, is_swapped: true} : b);
   showToast('Marked as swapped ✓');
   renderShelf(true);
+  // Find the book to get the requester's details for rating
+  const book = allBooks.find(b => b.id === id);
+  if (book) {
+    // Look up who requested this book
+    const { data: reqs } = await db.select('requests', { select: 'from_name', filter: { book_id: id } });
+    if (reqs?.length) {
+      setTimeout(() => openRating(id, null, reqs[0].from_name || 'the other person'), 800);
+    }
+  }
 }
 
 async function deleteBook(id) {
