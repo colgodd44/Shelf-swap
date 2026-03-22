@@ -861,21 +861,22 @@ let selectedWillPost = false;
 
 
 async function fetchSynopsis(book) {
-  const section = document.getElementById('synopsis-section');
-  const text = document.getElementById('synopsis-text');
-  if (!section || !text) return;
-  section.style.display = 'block';
-  text.innerHTML = '<span class="synopsis-loading">Loading…</span>';
+  const bookId = book.id;
   try {
     const q = book.isbn ? 'isbn:' + book.isbn : encodeURIComponent(book.title + ' ' + book.author);
     const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1&fields=items(volumeInfo/description)');
-    if (!res.ok) { section.style.display = 'none'; return; }
+    if (!res.ok) return;
     const data = await res.json();
     const desc = data.items?.[0]?.volumeInfo?.description;
-    if (!desc) { section.style.display = 'none'; return; }
-    // Strip HTML tags from description
+    if (!desc) return;
+    // Only update if the same book is still open
+    if (!currentBook || currentBook.id !== bookId) return;
+    const section = document.getElementById('synopsis-section');
+    const text = document.getElementById('synopsis-text');
+    if (!section || !text) return;
     text.textContent = desc.replace(/<[^>]*>/g, '');
-  } catch { section.style.display = 'none'; }
+    section.style.display = 'block';
+  } catch {}
 }
 
 
@@ -1874,13 +1875,12 @@ function openModal(id) {
   if (currentBook.note) { n.textContent = '"' + currentBook.note + '"'; n.style.display = 'block'; } else { n.style.display = 'none'; }
   const btn = document.getElementById('request-btn');
   if (btn) { btn.disabled = false; btn.textContent = 'Start swap chat →'; }
-  // Reset synopsis
+  document.getElementById('modal').classList.add('open');
+  // Fetch synopsis
   const synSection = document.getElementById('synopsis-section');
   const synText = document.getElementById('synopsis-text');
   if (synSection) synSection.style.display = 'none';
   if (synText) synText.textContent = '';
-  document.getElementById('modal').classList.add('open');
-  // Fetch synopsis after modal opens
   fetchSynopsis(currentBook);
 }
 
